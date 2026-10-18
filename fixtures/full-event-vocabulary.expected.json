@@ -1,0 +1,79 @@
+{
+  "terminal": true,
+  "months": [
+    {
+      "month": 0,
+      "cash": 1024500,
+      "assets_value": 0,
+      "monthly_cashflow": 24500
+    },
+    {
+      "month": 1,
+      "cash": 1049000,
+      "assets_value": 0,
+      "monthly_cashflow": 24500
+    },
+    {
+      "month": 2,
+      "cash": 868500,
+      "assets_value": 200000,
+      "monthly_cashflow": 19500
+    },
+    {
+      "month": 3,
+      "cash": -3250000,
+      "assets_value": 0,
+      "monthly_cashflow": 1500
+    },
+    {
+      "month": 4,
+      "cash": -4188500,
+      "assets_value": 0,
+      "monthly_cashflow": 21500
+    },
+    {
+      "month": 5,
+      "cash": -4163000,
+      "assets_value": 0,
+      "monthly_cashflow": 25500
+    },
+    {
+      "month": 6,
+      "cash": -4037500,
+      "assets_value": 0,
+      "monthly_cashflow": 125500
+    },
+    {
+      "month": 7,
+      "cash": -4002000,
+      "assets_value": 0,
+      "monthly_cashflow": 35500
+    },
+    {
+      "month": 8,
+      "cash": -3966500,
+      "assets_value": 0,
+      "monthly_cashflow": 35500
+    },
+    {
+      "month": 9,
+      "cash": -3951000,
+      "assets_value": 0,
+      "monthly_cashflow": 15500
+    },
+    {
+      "month": 10,
+      "cash": -3905500,
+      "assets_value": 0,
+      "monthly_cashflow": 45500
+    },
+    {
+      "month": 11,
+      "cash": -3910150,
+      "assets_value": 0,
+      "monthly_cashflow": 45500
+    }
+  ],
+  "terminal_month": 11,
+  "passive_income_month": 9
+}

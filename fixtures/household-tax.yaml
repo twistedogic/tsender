@@ -1,0 +1,11 @@
+cash: 0
+events:
+  - type: job
+    when: 0
+    salary: { monthly: 50000, annualized_rate: 0 }
+tax:
+  status: married
+  children: 2
+  parents:
+    - { age_band: 60+, living_with: false }
+    - { age_band: 60+, living_with: false }

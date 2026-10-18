@@ -27,3 +27,24 @@ Done means: full suite green (`vitest run` + `test:scenarios`), including a test
 - Money and tax logic in `src/model/` lands with a test pinning it. Scenario comparisons use `1e-9` float tolerance.
 - Canonical scenarios are committed pairs: `fixtures/<name>.yaml` + hand-verified `fixtures/<name>.expected.json`. A new simulator path gets a new fixture pair.
 - UI components: test behavior (render → interact → assert), not implementation details.
+
+## Verification
+
+End-to-end smoke (manual, not in CI): spin up the production build and fetch it with [lightpanda](https://lightpanda.github.io/).
+
+```bash
+npm run preview &           # build + serve on http://localhost:4173/tsender/
+sleep 5                     # wait for the build to finish
+lightpanda fetch --dump semantic_tree_text http://localhost:4173/tsender/
+kill %1
+```
+
+Sanity checks in the dumped tree:
+- `heading 'tsender'` is present
+- `<cash spinbutton>` is populated (default scenario: `500000`)
+- `<Final cash>` column shows a formatted number (default: `9,979,095`)
+- `run outcomes` region is present with an end-solvency callout
+
+Caveats:
+- lightpanda 1.6.0 throws `Path2D is not defined`; the chart canvas renders blank but every other part of the page works. Re-run after upgrading lightpanda.
+- localStorage state persists between runs in lightpanda; clear the storage or use `--no-cookie` / fresh profile if a run depends on a blank slate.

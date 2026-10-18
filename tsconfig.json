@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals", "node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/model/*": ["./src/model/*"],
+      "@/scenario/*": ["./src/scenario/*"],
+      "@/output/*": ["./src/output/*"],
+      "@/ui/*": ["./src/ui/*"],
+      "@/test/*": ["./src/test/*"]
+    },
+    "baseUrl": "."
+  },
+  "include": ["src", "scripts", "vitest.config.ts", "vite.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}
