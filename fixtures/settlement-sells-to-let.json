@@ -1,0 +1,31 @@
+{
+  "cash": 100,
+  "events": [
+    {
+      "type": "expense",
+      "when": 0,
+      "expense": {
+        "monthly": 200,
+        "annualized_rate": 0
+      }
+    },
+    {
+      "type": "buy_to_let",
+      "when": 0,
+      "to_let": {
+        "sqft": 100,
+        "price_per_sqft": 300,
+        "rent": {
+          "monthly": 500,
+          "annualized_rate": 0,
+          "occupancy": 1
+        },
+        "mortgage": {
+          "monthly": 100,
+          "period": 12
+        }
+      }
+    }
+  ],
+  "reserve_months": 3
+}

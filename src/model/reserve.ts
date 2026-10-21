@@ -24,10 +24,6 @@ export function propertySaleProceeds(property: Property): number {
 export interface SettlementResult {
   cashAfter: number;
   assetsAfter: Asset[];
-  fundDrawTotal: number;
-  propertySaleTotal: number;
-  /** Whether settlement could not reach the target (assets exhausted). */
-  breached: boolean;
 }
 
 export function settleReserve(
@@ -39,28 +35,21 @@ export function settleReserve(
     return {
       cashAfter: cash,
       assetsAfter: assets.slice(),
-      fundDrawTotal: 0,
-      propertySaleTotal: 0,
-      breached: false,
     };
   }
 
   const workingAssets = assets.slice(); // shallow copy; Funds get mutated in place
   let c = cash;
-  let fundDrawTotal = 0;
-  let propertySaleTotal = 0;
   const sold = new Set<Property>();
 
   // Funds first: drain in asset order, partially, floored at zero.
   for (const a of workingAssets) {
     if (a.kind !== "Fund") continue;
     if (c >= reserveTargetAmount) break;
-    const shortfall = reserveTargetAmount - c;
-    const draw = Math.min(a.principal, shortfall);
+    const draw = Math.min(a.principal, reserveTargetAmount - c);
     if (draw > 0) {
       a.principal -= draw;
       c += draw;
-      fundDrawTotal += draw;
     }
   }
 
@@ -68,20 +57,12 @@ export function settleReserve(
   for (const a of workingAssets) {
     if (c >= reserveTargetAmount) break;
     if (a.kind !== "Property") continue;
-    const proceeds = propertySaleProceeds(a);
-    c += proceeds;
-    propertySaleTotal += proceeds;
+    c += propertySaleProceeds(a);
     sold.add(a);
   }
 
-  const assetsAfter = workingAssets.filter((a) => !sold.has(a as Property));
-  const breached = c < reserveTargetAmount;
-
   return {
     cashAfter: c,
-    assetsAfter,
-    fundDrawTotal,
-    propertySaleTotal,
-    breached,
+    assetsAfter: workingAssets.filter((a) => !sold.has(a as Property)),
   };
 }

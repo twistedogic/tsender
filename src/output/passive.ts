@@ -78,18 +78,4 @@ export function recurringExpenseTotal(activeCashflows: Cashflow[]): number {
   return total;
 }
 
-/** Sum of pension payouts this month. */
-export function monthlyPension(cashflows: Cashflow[], grow: (c: Cashflow) => number): number {
-  let total = 0;
-  for (const c of cashflows) if (c.kind === "Pension") total += grow(c);
-  return total;
-}
-
 /** Sum of rental income (occupancy-applied) this month. */
-export function monthlyRental(cashflows: Cashflow[], grow: (c: Cashflow) => number): number {
-  let total = 0;
-  for (const c of cashflows) {
-    if (c.kind === "RentalIncome") total += grow(c) * c.occupancy;
-  }
-  return total;
-}

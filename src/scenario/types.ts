@@ -300,7 +300,8 @@ export interface Mortgage {
   monthly: number;
   period: number;
   paid: number;
-  id?: string;
+  /** Always set in simulator state (declared id or auto-generated). */
+  id: string;
 }
 
 // ---------- Output wrapper ----------

@@ -75,15 +75,12 @@ interface State {
   rentAccrued: number;
   allowance: number;
   reserveMonths: number;
-  saving?: number;
   /** Set when a death event fires in this month. */
   terminalAtMonth?: number;
   /** Cash impact this month split into reportable flows and silent asset costs. */
   oneOffNetThisMonth: number;
   assetCostThisMonth: number;
   recurringNetThisMonth: number;
-  taxThisMonth: number;
-  settlementNetThisMonth: number;
 }
 
 export function runScenario(scenario: Scenario): RunResult {
@@ -97,12 +94,9 @@ export function runScenario(scenario: Scenario): RunResult {
     rentAccrued: 0,
     allowance: computeAllowance(scenario.tax),
     reserveMonths: scenario.reserve_months ?? 0,
-    ...(scenario.saving !== undefined && { saving: scenario.saving }),
     oneOffNetThisMonth: 0,
     assetCostThisMonth: 0,
     recurringNetThisMonth: 0,
-    taxThisMonth: 0,
-    settlementNetThisMonth: 0,
   };
   const maxMonths = horizonMonths(scenario);
 
@@ -130,7 +124,6 @@ export function runScenario(scenario: Scenario): RunResult {
     breakdowns.push(buildBreakdown(state));
 
     tickAges(state);
-    pruneConsumedEvents(state, m);
 
     if (terminal) break;
   }
@@ -147,8 +140,6 @@ export function runScenario(scenario: Scenario): RunResult {
 function step(state: State, m: number): void {
   state.oneOffNetThisMonth = 0;
   state.assetCostThisMonth = 0;
-  state.taxThisMonth = 0;
-  state.settlementNetThisMonth = 0;
 
   fireEventsAt(state, m);
 
@@ -176,6 +167,14 @@ function step(state: State, m: number): void {
   state.cash += state.oneOffNetThisMonth;
   state.cash -= state.assetCostThisMonth;
 
+  // Count mortgage payments made this month; sale proceeds value the
+  // remaining ones at `monthly x (period - paid)` (scenario-loading spec).
+  for (const a of state.assets) {
+    if (a.kind !== "Property" || !a.mortgage) continue;
+    const cf = findMortgagePaymentById(state.cashflows, a.mortgage.id);
+    if (cf && cf.remaining > 0) a.mortgage.paid++;
+  }
+
   // Tax at block end.
   if (m >= 11 && (m + 1) % 12 === 0) {
     const sa = salariesTaxForBlock(
@@ -184,8 +183,8 @@ function step(state: State, m: number): void {
       state.allowance,
     );
     const pt = propertyTaxForBlock(state.rentAccrued);
-    state.taxThisMonth = sa.charge + pt;
-    state.cash -= state.taxThisMonth;
+    const tax = sa.charge + pt;
+    state.cash -= tax;
     state.incomeAccrued = 0;
     state.mpfAccrued = 0;
     state.rentAccrued = 0;
@@ -196,7 +195,6 @@ function step(state: State, m: number): void {
     const target = state.reserveMonths * recurringExpenses;
     if (state.cash < target) {
       const r = settleReserve(state.cash, target, state.assets);
-      state.settlementNetThisMonth = r.cashAfter - state.cash;
       state.cash = r.cashAfter;
       state.assets = r.assetsAfter;
       pruneCashflowsAfterSettlement(state.cashflows, state.assets);
@@ -397,7 +395,7 @@ function applyEvent(e: Event, state: State): void {
       state.oneOffNetThisMonth += Math.abs(e.one_off.amount);
       return;
     case "death":
-      state.terminalAtMonth = (e as Event & { when: number }).when;
+      state.terminalAtMonth = e.when;
       return;
     case "refinance": {
       for (const a of state.assets) {
@@ -452,7 +450,7 @@ function acquireProperty(
         monthly: mortgageSpec.monthly,
         period: mortgageSpec.period,
         paid: 0,
-        ...(mortgageSpec.id !== undefined && { id: mortgageSpec.id }),
+        id: mortgageSpec.id ?? nextCashflowId("mortgage"),
       },
     }),
   };
@@ -465,7 +463,7 @@ function acquireProperty(
   if (prop.mortgage) {
     const cf: MortgagePaymentCashflow = {
       kind: "MortgagePayment",
-      id: prop.mortgage.id ?? nextCashflowId("mortgage"),
+      id: prop.mortgage.id,
       monthly: prop.mortgage.monthly,
       age: 0,
       remaining: prop.mortgage.period,
@@ -525,30 +523,28 @@ function removeFirstOfKind(cashflows: Cashflow[], kind: Cashflow["kind"]): void 
 
 // ---------- Settlement pruning ----------
 
+/**
+ * After settlement, drop cashflows owned by sold assets: mortgage payments
+ * (matched by the mortgage id stamped at acquisition) and rental income
+ * (matched by object identity — the property holds the same reference, so
+ * unlabeled rents prune correctly too).
+ */
 function pruneCashflowsAfterSettlement(cashflows: Cashflow[], survivors: Asset[]): void {
   const survivingMortgageIds = new Set<string>();
+  const survivingRents = new Set<RentalIncomeCashflow>();
   for (const a of survivors) {
-    if (a.kind === "Property" && a.mortgage?.id) survivingMortgageIds.add(a.mortgage.id);
+    if (a.kind !== "Property") continue;
+    if (a.mortgage) survivingMortgageIds.add(a.mortgage.id);
+    if (a.rent) survivingRents.add(a.rent);
   }
-  // Remove MortgagePayment cashflows whose ids aren't in the survivor set.
   for (let i = cashflows.length - 1; i >= 0; i--) {
     const c = cashflows[i]!;
     if (c.kind === "MortgagePayment" && !survivingMortgageIds.has(c.id)) {
       cashflows.splice(i, 1);
+    } else if (c.kind === "RentalIncome" && !survivingRents.has(c)) {
+      cashflows.splice(i, 1);
     }
   }
-  // Rent cashflows are already cleaned up by `end` references; we just drop
-  // any RentalIncome whose owning asset is gone. Easiest pass: trust the
-  // caller has already mutated `assets` and clean dangling rentals via id
-  // sets derived from survivors.
-  const survivingRentIds = new Set<string>();
-  for (const a of survivors) {
-    if (a.kind === "Property" && a.rent?.id) survivingRentIds.add(a.rent.id);
-  }
-  // Unlabeled rentals survive via positional order in assets; we leave them.
-  // For correctness in our model, every rental asset either has its property
-  // here or is sold; an unlabeled rent that survives because its property
-  // survived has nothing to drop.
 }
 
 // ---------- Tick ----------
@@ -558,10 +554,6 @@ function tickAges(state: State): void {
     c.age++;
     if (c.kind === "MortgagePayment" && c.remaining > 0) c.remaining--;
   }
-}
-
-function pruneConsumedEvents(_state: State, _m: number): void {
-  // fireEventsAt already filtered; nothing more to do here.
 }
 
 function buildBreakdown(state: State): MonthBreakdown {
