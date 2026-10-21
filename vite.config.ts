@@ -41,11 +41,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": "/src",
-      "@/model": "/src/model",
-      "@/scenario": "/src/scenario",
-      "@/output": "/src/output",
-      "@/ui": "/src/ui",
-      "@/test": "/src/test",
     },
   },
   build: {

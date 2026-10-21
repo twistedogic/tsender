@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { Event, Scenario } from "@/scenario/types";
 import { EventForm } from "@/ui/EventForm";
 import { TaxBlockForm } from "@/ui/TaxBlockForm";
@@ -32,6 +32,7 @@ export interface ScenarioFormProps {
 
 export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
   const top = (patch: Partial<Scenario>) => onChange({ ...scenario, ...patch });
+  const [newEventType, setNewEventType] = useState<EventTypeChoice>("job");
 
   return (
     <form
@@ -48,13 +49,17 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
         <div className="events-add">
           <label htmlFor="event-type">
             Add event:&nbsp;
-            <select id="event-type" defaultValue="job">
+            <select
+              id="event-type"
+              value={newEventType}
+              onChange={(e) => setNewEventType(e.currentTarget.value as EventTypeChoice)}
+            >
               {EVENT_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </label>
-          <button type="button" onClick={() => addEvent()}>
+          <button type="button" onClick={() => addEvent(newEventType)}>
             Add
           </button>
         </div>
@@ -94,31 +99,28 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
     </form>
   );
 
-  function addEvent() {
-    const select = document.getElementById("event-type") as HTMLSelectElement | null;
-    const t = (select?.value as EventTypeChoice) ?? "job";
+  function addEvent(type: EventTypeChoice) {
     const when = scenario.events.length === 0 ? 0 : Math.max(...scenario.events.map((e) => e.when)) + 1;
-    const event = makeEmptyEvent(t, when);
-    top({ events: [...scenario.events, event] });
+    top({ events: [...scenario.events, makeEmptyEvent(type, when)] });
   }
 }
 
 function makeEmptyEvent(type: EventTypeChoice, when: number): Event {
-  const base = { type, when } as Event;
   switch (type) {
     case "job":
-      return { ...base, type, when, salary: { monthly: 0, annualized_rate: 0 } } as Event;
+      return { type, when, salary: { monthly: 0, annualized_rate: 0 } };
     case "pension":
-      return { ...base, type, when, pension: { monthly: 0, annualized_rate: 0 } } as Event;
+      return { type, when, pension: { monthly: 0, annualized_rate: 0 } };
     case "expense":
-        return { ...base, type, when, expense: { monthly: 0, annualized_rate: 0 } } as Event;
+      return { type, when, expense: { monthly: 0, annualized_rate: 0 } };
     case "tuition":
-      return { ...base, type, when, tuition: { monthly: 0, annualized_rate: 0 } } as Event;
+      return { type, when, tuition: { monthly: 0, annualized_rate: 0 } };
     case "withdrawal":
-      return { ...base, type, when, withdrawal: { monthly: 0, annualized_rate: 0 } } as Event;
+      return { type, when, withdrawal: { monthly: 0, annualized_rate: 0 } };
     case "layoff":
     case "graduate":
-      return { ...base, type, when } as Event;
+    case "death":
+      return { type, when };
     case "buy_home":
       return {
         type,
@@ -146,8 +148,6 @@ function makeEmptyEvent(type: EventTypeChoice, when: number): Event {
     case "one_off_expense":
     case "one_off_income":
       return { type, when, one_off: { amount: 0 } };
-    case "death":
-      return { type, when };
     case "refinance":
       return { type, when, id: "", monthly: 0 };
     case "pay_change":

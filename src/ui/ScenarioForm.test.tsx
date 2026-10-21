@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ScenarioForm } from "@/ui/ScenarioForm";
-import { loadScenario, serializeScenario } from "@/scenario/yaml";
+import { loadFromStorage, saveToStorage } from "@/ui/storage";
 import type { Scenario } from "@/scenario/types";
 
 // jsdom doesn't implement ResizeObserver; uPlot's chart would crash otherwise.
@@ -37,36 +37,23 @@ describe("ScenarioForm", () => {
     );
     expect(screen.getByText(/Add event/i)).toBeInTheDocument();
   });
+});
 
-  it("top-level edits serialize through loadScenario", () => {
-    const start: Scenario = {
-      cash: 50000,
-      reserve_months: 3,
-      events: [],
+describe("scenario storage", () => {
+  it("round-trips a scenario through localStorage and rejects corrupt data", () => {
+    const s: Scenario = {
+      cash: 12345,
+      events: [
+        { type: "job", when: 0, salary: { monthly: 100, annualized_rate: 0 } },
+      ],
     };
-    const yaml = serializeScenario(start);
-    expect(loadScenario(yaml)).toEqual(start);
-  });
+    expect(saveToStorage(s).ok).toBe(true);
+    expect(loadFromStorage()).toEqual(s);
 
-  it("the form reflects a YAML with all event types after parsing", () => {
-    // We exercise the round-trip path; UI assertion is structural.
-    const yaml = `
-cash: 100000
-reserve_months: 3
-events:
-  - type: job
-    when: 0
-    id: me
-    salary: { monthly: 30000, annualized_rate: 0.03 }
-  - type: pension
-    when: 360
-    pension: { monthly: 15000, annualized_rate: 0.025 }
-  - type: death
-    when: 720
-`;
-    const s = loadScenario(yaml);
-    const back = serializeScenario(s);
-    expect(loadScenario(back)).toEqual(s);
+    localStorage.setItem("tsender.scenario.v1", "{not json");
+    expect(loadFromStorage()).toBeNull();
+    localStorage.setItem("tsender.scenario.v1", "[1,2,3]");
+    expect(loadFromStorage()).toBeNull();
   });
 });
 

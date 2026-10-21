@@ -1,7 +1,0 @@
-cash: 0
-events:
-  - type: job
-    when: 0
-    salary: { monthly: 5000, annualized_rate: 0 }
-  - type: death
-    when: 24

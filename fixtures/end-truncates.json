@@ -1,0 +1,15 @@
+{
+  "cash": 0,
+  "events": [
+    {
+      "type": "job",
+      "when": 0,
+      "salary": {
+        "monthly": 30000,
+        "annualized_rate": 0
+      }
+    }
+  ],
+  "start": "2026-08",
+  "end": "2029-08"
+}

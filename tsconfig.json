@@ -21,12 +21,7 @@
     "skipLibCheck": true,
     "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals", "node"],
     "paths": {
-      "@/*": ["./src/*"],
-      "@/model/*": ["./src/model/*"],
-      "@/scenario/*": ["./src/scenario/*"],
-      "@/output/*": ["./src/output/*"],
-      "@/ui/*": ["./src/ui/*"],
-      "@/test/*": ["./src/test/*"]
+      "@/*": ["./src/*"]
     },
     "baseUrl": "."
   },

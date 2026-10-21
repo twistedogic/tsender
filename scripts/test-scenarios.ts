@@ -1,6 +1,7 @@
 /**
- * Scenario regression: for each committed `fixtures/*.yaml`, run the simulator
- * and diff against `fixtures/*.expected.json` (within `1e-9` numeric tolerance).
+ * Scenario regression: for each committed `fixtures/*.json` (a Scenario
+ * object), run the simulator and diff against `fixtures/*.expected.json`
+ * (within `1e-9` numeric tolerance).
  *
  * Per the simulation-output spec: both sides of the diff are JSON-serializable
  * wrapper objects; numbers carry IEEE 754 rounding. Float comparisons use
@@ -8,10 +9,9 @@
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, basename, extname } from "node:path";
-import { loadScenario } from "@/scenario/yaml";
+import { join, basename } from "node:path";
 import { runScenario } from "@/model/simulator";
-import type { RunResult } from "@/scenario/types";
+import type { RunResult, Scenario } from "@/scenario/types";
 
 const FIXTURES_DIR = "fixtures";
 const TOLERANCE = 1e-9;
@@ -55,13 +55,15 @@ function deepEqual(a: unknown, b: unknown): { ok: boolean; why?: string } {
   return { ok: false, why: `unhandled types` };
 }
 
-function listFixturePairs(): Array<{ name: string; yamlPath: string; expectedPath: string }> {
-  const names = readdirSync(FIXTURES_DIR).filter((f) => f.endsWith(".yaml"));
-  return names.map((yaml) => {
-    const name = basename(yaml, extname(yaml));
+function listFixturePairs(): Array<{ name: string; scenarioPath: string; expectedPath: string }> {
+  const names = readdirSync(FIXTURES_DIR).filter(
+    (f) => f.endsWith(".json") && !f.endsWith(".expected.json"),
+  );
+  return names.map((f) => {
+    const name = basename(f, ".json");
     return {
       name,
-      yamlPath: join(FIXTURES_DIR, yaml),
+      scenarioPath: join(FIXTURES_DIR, f),
       expectedPath: join(FIXTURES_DIR, `${name}.expected.json`),
     };
   });
@@ -76,11 +78,10 @@ for (const pair of listFixturePairs()) {
     failed++;
     continue;
   }
-  const yaml = readFileSync(pair.yamlPath, "utf8");
+  const scenario: Scenario = JSON.parse(readFileSync(pair.scenarioPath, "utf8"));
   const expected: RunResult = JSON.parse(readFileSync(pair.expectedPath, "utf8"));
   let actual: RunResult;
   try {
-    const scenario = loadScenario(yaml, pair.yamlPath);
     actual = runScenario(scenario);
   } catch (e) {
     console.error(`✗ ${pair.name}: ${e instanceof Error ? e.message : String(e)}`);

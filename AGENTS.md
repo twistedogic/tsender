@@ -25,7 +25,7 @@ Work test-first, red-green-refactor:
 Done means: full suite green (`vitest run` + `test:scenarios`), including a test that fails without your change.
 
 - Money and tax logic in `src/model/` lands with a test pinning it. Scenario comparisons use `1e-9` float tolerance.
-- Canonical scenarios are committed pairs: `fixtures/<name>.yaml` + hand-verified `fixtures/<name>.expected.json`. A new simulator path gets a new fixture pair.
+- Canonical scenarios are committed pairs: `fixtures/<name>.json` (a Scenario object) + hand-verified `fixtures/<name>.expected.json`. A new simulator path gets a new fixture pair.
 - UI components: test behavior (render → interact → assert), not implementation details.
 
 ## Verification

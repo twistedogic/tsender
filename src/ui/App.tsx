@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RunResult, Scenario } from "@/scenario/types";
-import { loadScenario, serializeScenario, ScenarioLoadError } from "@/scenario/yaml";
 import { ScenarioForm } from "@/ui/ScenarioForm";
 import { ResultsSummary } from "@/ui/ResultsSummary";
 import { ResultsChart } from "@/ui/ResultsChart";
 import { RunOutcomes } from "@/ui/RunOutcomes";
 import { useSimulation } from "@/ui/useSimulation";
-import { clearStorage, loadFromStorage, saveToStorage } from "@/ui/storage";
+import { loadFromStorage, saveToStorage } from "@/ui/storage";
 
 const DEFAULT_SCENARIO: Scenario = {
   cash: 500_000,
@@ -42,100 +41,63 @@ export function App() {
       <section className="layout">
         <div className="editor">
           <Toolbar
-            onReset={() => {
-              clearStorage();
-              setScenario({ cash: 0, events: [] });
-            }}
+            onReset={() => setScenario({ cash: 0, events: [] })}
             onRun={run}
-            onImport={importScenario(setScenario, setStorageToast)}
-            onExport={exportScenario(scenario)}
             pending={pending}
             storageToast={storageToast}
           />
           <ScenarioForm scenario={scenario} onChange={setScenario} />
         </div>
         <div className="results">
-          {result ? (
-            <>
-              <ResultsSummary result={result} />
-              <ResultsChart
-                months={result.months}
-                {...(savingBreach(result, scenario.saving) !== undefined && {
-                  savingBreachMonth: savingBreach(result, scenario.saving),
-                })}
-                {...(firstInsolvent(result.months) !== undefined && {
-                  insolvencyMonth: firstInsolvent(result.months),
-                })}
-                {...(result.terminal_month !== undefined && {
-                  terminalMonth: result.terminal_month,
-                })}
-              />
-              <Markers result={result} saving={scenario.saving} />
-              <RunOutcomes result={result} />
-            </>
-          ) : null}
+          {result ? <Results result={result} scenario={scenario} /> : null}
         </div>
       </section>
     </div>
   );
 }
 
+function Results({ result, scenario }: { result: RunResult; scenario: Scenario }) {
+  const insolvencyMonth = firstInsolvent(result.months);
+  const savingBreachMonth = savingBreach(result, scenario.saving);
+  return (
+    <>
+      <ResultsSummary result={result} />
+      <ResultsChart
+        months={result.months}
+        insolvencyMonth={insolvencyMonth}
+        savingBreachMonth={savingBreachMonth}
+        terminalMonth={result.terminal_month}
+      />
+      <Markers
+        insolvencyMonth={insolvencyMonth}
+        savingBreachMonth={savingBreachMonth}
+        terminal={result.terminal}
+        terminalMonth={result.terminal_month}
+      />
+      <RunOutcomes result={result} />
+    </>
+  );
+}
+
 function Toolbar({
   onReset,
   onRun,
-  onImport,
-  onExport,
   pending,
   storageToast,
 }: {
   onReset: () => void;
   onRun: () => void;
-  onImport: () => void;
-  onExport: () => void;
   pending: boolean;
   storageToast: string | null;
 }) {
   return (
     <div className="toolbar">
       <button type="button" onClick={onRun}>Run</button>
-      <button type="button" onClick={onImport}>Import YAML</button>
-      <button type="button" onClick={onExport}>Export scenario.yaml</button>
       <button type="button" onClick={onReset}>Reset</button>
       {pending ? <span className="pending">running…</span> : null}
       {storageToast ? <span className="toast">{storageToast}</span> : null}
     </div>
   );
-}
-
-function importScenario(
-  setScenario: (s: Scenario) => void,
-  setToast: (s: string | null) => void,
-): () => void {
-  return () => {
-    const pasted = window.prompt("Paste scenario YAML:");
-    if (pasted === null) return;
-    try {
-      const parsed = loadScenario(pasted, "pasted YAML");
-      setScenario(parsed);
-      setToast(null);
-    } catch (e) {
-      const msg = e instanceof ScenarioLoadError ? e.message : String(e);
-      setToast(msg);
-    }
-  };
-}
-
-function exportScenario(s: Scenario): () => void {
-  return () => {
-    const yaml = serializeScenario(s);
-    const blob = new Blob([yaml], { type: "text/yaml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "scenario.yaml";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 }
 
 function firstInsolvent(months: { month: number; cash: number }[]): number | undefined {
@@ -156,20 +118,30 @@ function savingBreach(
   return undefined;
 }
 
-function Markers({ result, saving }: { result: RunResult; saving: number | undefined }) {
-  const ins = firstInsolvent(result.months);
-  const breach = savingBreach(result, saving);
-  if (ins === undefined && breach === undefined && !result.terminal) return null;
+function Markers({
+  insolvencyMonth,
+  savingBreachMonth,
+  terminal,
+  terminalMonth,
+}: {
+  insolvencyMonth?: number;
+  savingBreachMonth?: number;
+  terminal: boolean;
+  terminalMonth?: number;
+}) {
+  if (insolvencyMonth === undefined && savingBreachMonth === undefined && !terminal) {
+    return null;
+  }
   return (
     <ul className="markers">
-      {ins !== undefined ? (
-        <li data-marker="insolvency">insolvent from month {ins}</li>
+      {insolvencyMonth !== undefined ? (
+        <li data-marker="insolvency">insolvent from month {insolvencyMonth}</li>
       ) : null}
-      {breach !== undefined ? (
-        <li data-marker="saving">saving target breached from month {breach}</li>
+      {savingBreachMonth !== undefined ? (
+        <li data-marker="saving">saving target breached from month {savingBreachMonth}</li>
       ) : null}
-      {result.terminal ? (
-        <li data-marker="terminal">terminal at month {result.terminal_month}</li>
+      {terminal ? (
+        <li data-marker="terminal">terminal at month {terminalMonth}</li>
       ) : null}
     </ul>
   );

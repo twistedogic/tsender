@@ -1,0 +1,22 @@
+{
+  "cash": 10000,
+  "events": [
+    {
+      "type": "investment",
+      "when": 0,
+      "fund": {
+        "principal": 5000,
+        "annualized_rate": 0
+      }
+    },
+    {
+      "type": "expense",
+      "when": 6,
+      "expense": {
+        "monthly": 1500,
+        "annualized_rate": 0
+      }
+    }
+  ],
+  "reserve_months": 3
+}
