@@ -1,32 +1,31 @@
 # scenario-loading Specification
 
 ## Purpose
-
-Load a scenario (starting cash + events) from a YAML file into a runnable `Scenario`, with defined error reporting for invalid files.
+Define the scenario — starting cash plus events — as a typed object, and the behavioral semantics of every event type. There is no file format and no text parsing; the object is authored by the form (capability `scenario-authoring`) and consumed by `runScenario`.
 
 ## Requirements
 
-### Requirement: Scenario is defined in a YAML file
-The system SHALL load a scenario from a YAML file containing starting `cash` and a list of `events`, where each event has a `when` (month index, 0-based) and a `type` discriminator. Supported event types SHALL include `job`, `pension`, `expense`, `tuition`, `withdrawal`, `layoff`, `graduate`, `buy_home`, `buy_to_let`, `investment`, `end`, `one_off_expense`, `one_off_income`, and `death`.
+### Requirement: Scenario is a typed object
+The system SHALL accept a scenario as a typed object containing starting `cash` and a list of `events`, where each event has a `when` (month index, 0-based) and a `type` discriminator. Supported event types SHALL include `job`, `pension`, `expense`, `tuition`, `withdrawal`, `layoff`, `graduate`, `buy_home`, `buy_to_let`, `investment`, `end`, `one_off_expense`, `one_off_income`, and `death`. There SHALL be no text serialization of a scenario; consumers construct the object directly.
 
 #### Scenario: Minimal scenario
-- **WHEN** a YAML file contains `cash: 20000` and an empty `events` list
-- **THEN** loading it yields a `Scenario` with 20000.0 cash, no cashflows, no assets, and no events
+- **WHEN** a scenario object has `cash: 20000` and an empty `events` list
+- **THEN** running it starts with 20000 cash, no cashflows, no assets, and no events
 
 #### Scenario: Full event vocabulary
-- **WHEN** a YAML file uses each event type — `job`, `pension`, `expense`, `tuition`, `withdrawal`, `buy_home`, `buy_to_let`, `investment`, `end`, `one_off_expense`, `one_off_income`, `death` — with their required fields
-- **THEN** loading it yields a `Scenario` whose cashflow and asset lists contain the corresponding items, and whose event list contains the `end` and `death` events
+- **WHEN** a scenario object uses each event type — `job`, `pension`, `expense`, `tuition`, `withdrawal`, `buy_home`, `buy_to_let`, `investment`, `end`, `one_off_expense`, `one_off_income`, `death` — with their required fields
+- **THEN** running it produces a state whose cashflow and asset lists contain the corresponding items, and whose event list contains the `end` and `death` events
 
 ### Requirement: Pension event adds a non-MPF income cashflow
-The scenario file SHALL accept a new event type `pension` alongside `job`, `expense`, `tuition`, and the other existing variants. The event SHALL carry a body map `pension: {monthly, annualized_rate}` mirroring the shape of `salary`. When the event fires, the system SHALL add a `Pension` cashflow item to the scenario's cashflow list whose `monthly` and `annualized_rate` equal the body's fields. The pension's `monthly` SHALL grow by `(1 + annualized_rate)^(1/12)` per simulated month, identical to how `salary` / `rent` / `tuition` grow, and SHALL be paid in full into cash with no MPF deduction. Pension gross SHALL feed the salaries-tax base; see capability `hk-salaries-tax` for the tax treatment.
+The scenario SHALL accept an event type `pension` alongside `job`, `expense`, `tuition`, and the other existing variants. The event SHALL carry a body `pension: {monthly, annualized_rate}` mirroring the shape of `salary`. When the event fires, the system SHALL add a `Pension` cashflow item to the scenario's cashflow list whose `monthly` and `annualized_rate` equal the body's fields. The pension's `monthly` SHALL grow by `(1 + annualized_rate)^(1/12)` per simulated month, identical to how `salary` / `rent` / `tuition` grow, and SHALL be paid in full into cash with no MPF deduction. Pension gross SHALL feed the salaries-tax base; see capability `hk-salaries-tax` for the tax treatment.
 
 #### Scenario: Pension event adds a non-MPF income cashflow
-- **WHEN** a scenario declares `{ type: pension, when: 360, pension: {monthly: 15000, annualized_rate: 0.025} }`
+- **WHEN** a scenario declares a pension event `{ monthly: 15000, annualized_rate: 0.025 }` at month 0 and the run reaches month 360
 - **THEN** after month 360 the cashflow list contains a `Pension` item with `monthly: 15000.0` and `annualized_rate: 0.025`, and the next simulated month reports a `monthly_cashflow` of `+15000.0` (not `+15000 - MPF`) and `cash` increases by 15000 from the prior month.
 
 #### Scenario: Pension event rejected without body
-- **WHEN** a scenario declares `type: pension` with no `pension` body
-- **THEN** loading fails with an error naming the source.
+- **WHEN** the user authors a pension event in the form
+- **THEN** the pension subform always supplies a `{monthly, annualized_rate}` body; a body-less pension cannot be authored, and no runtime rejection path exists
 
 ### Requirement: Death event ends the simulation at its firing month
 A `death` event SHALL be a supported event type with no body. When the event fires (at its `when` month), the system SHALL apply any other events scheduled for that month and settle the firing month's cashflows (including any scheduled `one_off_income` payouts), and SHALL then stop the simulation: no further months are simulated, no further events fire, and the run reports the firing month as the terminal month. A scenario that does not declare a `death` event SHALL run to the configured horizon exactly as before.
@@ -43,16 +42,16 @@ A `death` event SHALL be a supported event type with no body. When the event fir
 - **WHEN** a scenario declares `{ type: death, when: 24 }` and a `{ type: one_off_income, when: 24, one_off: { amount: 1000 } }`
 - **THEN** month 24's `monthly_cashflow` includes the +1000 payout AND the run terminates after month 24
 
-### Requirement: Simulation state is not part of the file format
-Fields that are runtime simulation state SHALL be defaulted during deserialization and SHALL NOT be required in the YAML file. Specifically, `Mortgage.paid` SHALL default to `0` and `OneOff.fired` SHALL default to `false`.
+### Requirement: Simulation state is not part of the scenario object
+Fields that are runtime simulation state SHALL be initialized by the simulator and SHALL NOT appear in the scenario object. Specifically, a mortgage's paid counter SHALL start at `0` and a one-off's fired state SHALL start unfired.
 
 #### Scenario: Mortgage without paid counter
-- **WHEN** a YAML mortgage specifies only `monthly` and `period`
-- **THEN** loading succeeds and the mortgage behaves as if nothing has been paid yet
+- **WHEN** a scenario's mortgage specifies only `monthly` and `period`
+- **THEN** the run behaves as if nothing has been paid yet
 
 #### Scenario: One-off without fired flag
-- **WHEN** a YAML one-off specifies only `amount`
-- **THEN** loading succeeds and the one-off behaves as if it has not fired yet
+- **WHEN** a scenario's one-off specifies only `amount`
+- **THEN** the run behaves as if it has not fired yet
 
 ### Requirement: Events fire once
 An event SHALL be consumed when it fires (the month in `when` is reached) and SHALL NOT fire again on later months.
@@ -61,27 +60,16 @@ An event SHALL be consumed when it fires (the month in `when` is reached) and SH
 - **WHEN** an `expense` event with `when: 3` is loaded and the scenario runs for 12 months
 - **THEN** the expense cashflow is added exactly once, at month 3
 
-### Requirement: Invalid files fail with a clear error
-Loading a YAML file that is missing required fields, has unknown event types, or is not valid YAML SHALL return an error that identifies the source and the reason.
-
-#### Scenario: Unknown event type
-- **WHEN** an event has `type: lottery_win`
-- **THEN** loading fails with an error naming the source and the unknown variant
-
-#### Scenario: Malformed YAML
-- **WHEN** the file is not valid YAML
-- **THEN** loading fails with an error naming the source and the parse failure
-
 ### Requirement: Cashflow items may carry an id label
 Every cashflow item, wherever it appears — added by a top-level event (`job`, `expense`, `tuition`, `one_off_expense`, `one_off_income`) or embedded in an asset (fund `investment`, property `rental`, property `mortgage`) — SHALL accept an optional string `id`. Items without an `id` SHALL load and behave exactly as before.
 
 #### Scenario: Labeled salary loads
 - **WHEN** a `job` event specifies `{ type: job, id: partner, salary: { monthly: 6000, annualized_rate: 0.03 } }`
-- **THEN** loading succeeds and the resulting cashflow item carries id `partner`
+- **THEN** the resulting cashflow item carries id `partner`
 
 #### Scenario: Unlabeled scenario is unchanged
-- **WHEN** a scenario file with no `id` fields anywhere is loaded
-- **THEN** loading succeeds and behavior is identical to before this change
+- **WHEN** a scenario has no `id` labels on any item
+- **THEN** behavior is identical to a labeled-equivalent scenario without the labels
 
 ### Requirement: End event removes the labeled item matching its id
 An `end` event SHALL remove the first cashflow item whose `id` equals the event's `id`, scanning the top-level cashflow list first, then assets in order. If no item carries a matching id, the event SHALL be a silent no-op. Duplicate ids SHALL resolve to the first match in scan order.
@@ -152,19 +140,19 @@ A `one_off_expense` or `one_off_income` event SHALL add a cashflow item that con
 - **THEN** the one-off is removed and contributes nothing in its month
 
 ### Requirement: Scenario may declare a cash reserve
-The scenario file SHALL accept an optional top-level `reserve_months` field: a non-negative integer number of months of recurring expenses to hold as cash. When the field is absent or `0`, no reserve requirement SHALL apply and behavior SHALL be identical to a scenario without the field. A `reserve_months` value that is not a non-negative integer SHALL fail loading with the existing file error reporting.
+The scenario object SHALL accept an optional top-level `reserve_months` field: a non-negative integer number of months of recurring expenses to hold as cash. When the field is absent, the reserve requirement SHALL not apply.
 
 #### Scenario: Reserve loads
-- **WHEN** a YAML file specifies `reserve_months: 3` alongside `cash` and `events`
-- **THEN** loading succeeds and the scenario carries a 3-month reserve requirement
+- **WHEN** a scenario object specifies `reserve_months: 3` alongside `cash` and `events`
+- **THEN** the scenario carries a 3-month reserve requirement
 
 #### Scenario: Absent reserve disables settlement
 - **WHEN** a scenario with no `reserve_months` field runs a month whose flows take cash negative while a fund asset exists
 - **THEN** nothing is liquidated and cash simply goes negative, exactly as before this change
 
 #### Scenario: Negative reserve fails to load
-- **WHEN** a YAML file specifies `reserve_months: -1`
-- **THEN** loading fails with an error naming the source
+- **WHEN** a scenario object carries a non-positive `reserve_months`
+- **THEN** the simulator treats it as absent: no reserve requirement applies and no error is reported
 
 ### Requirement: Settlement restores the cash reserve by liquidation in order
 When a reserve is configured, the system SHALL, after applying each month's flows to cash, compute the reserve target as `reserve_months ×` that month's recurring expense total — the sum of all negative flows of the month excluding one-off items' firing amounts, including embedded asset flows such as mortgage payments and fund contributions. If cash is at or above the target, nothing SHALL happen. Otherwise the shortfall SHALL be funded in a fixed order: first by drawing fund principal (partially, in asset order, each fund floored at zero), then by selling whole properties in asset order. A property's sale proceeds SHALL be its current market value minus its mortgage's remaining total payments (`monthly × (period − paid)` as of that month), and the sale SHALL remove the asset so its mortgage and rental flows stop in later months. Liquidation SHALL stop as soon as cash reaches the target; sale overshoot SHALL remain in cash. Liquidation proceeds and drawdowns SHALL NOT appear in `monthly_cashflow`. The reserve SHALL be breached — cash left below the target, possibly negative — only when all funds and properties are exhausted, and a month that ends with cash below zero after settlement SHALL be reported by the run as insolvent.
@@ -222,32 +210,19 @@ appear in `monthly_cashflow`.
 - **THEN** the drops are applied once at month 36 and never again
 
 ### Requirement: Refinance event replaces a mortgage's monthly payment
-A `refinance` event SHALL replace the `monthly` value of a mortgage
-identified by `id` at the month the event fires. The event SHALL carry an
-`id` (the `Labeled::id` on the target mortgage's enclosing property asset)
-and a `monthly` (the new payment amount, non-negative). The replacement
-SHALL leave `period`, `paid`, and the property's other fields untouched.
-The event SHALL be a silent no-op when no asset's mortgage carries the
-matching id. Refinance SHALL NOT appear in `monthly_cashflow`; the new
-payment takes effect in the firing month's own cashflow (events fire
-before the month's flows settle).
+A `refinance` event SHALL replace the `monthly` value of a mortgage identified by `id` at the month the event fires. The event SHALL carry an `id` (the label on the target mortgage's enclosing property asset) and a `monthly` (the new payment amount, non-negative). The replacement SHALL leave `period`, `paid`, and the property's other fields untouched. The event SHALL be a silent no-op when no asset's mortgage carries the matching id. Refinance SHALL NOT appear in `monthly_cashflow`; the new payment takes effect in the firing month's own cashflow (events fire before the month's flows settle).
 
 #### Scenario: Refinance updates the monthly on the matching property
-- **WHEN** a property asset has `mortgage.id: home-loan` with
-  `monthly: 30000, period: 300`, and a refinance event with
-  `id: home-loan, monthly: 42000` fires
-- **THEN** the property's mortgage `monthly` becomes 42000 in the firing
-  month and subsequent months, and the firing month's `monthly_cashflow`
-  reflects the higher payment
+- **WHEN** a property asset has a mortgage with `id: home-loan`, `monthly: 30000, period: 300`, and a refinance event with `id: home-loan, monthly: 42000` fires
+- **THEN** the property's mortgage `monthly` becomes 42000 in the firing month and subsequent months, and the firing month's `monthly_cashflow` reflects the higher payment
 
 #### Scenario: Unknown refinance id is a no-op
-- **WHEN** a refinance event with `id: ghost` fires and no asset carries
-  that id
+- **WHEN** a refinance event with `id: ghost` fires and no asset carries that id
 - **THEN** no mortgage is modified, the scenario continues, and no error is reported
 
 #### Scenario: Refinance without an id fails to load
-- **WHEN** a refinance event is declared without an `id`
-- **THEN** loading fails with an error naming the source
+- **WHEN** a refinance event without an `id` reaches the simulator
+- **THEN** it is a silent no-op (no mortgage carries an undefined id) and no error is reported
 
 ### Requirement: Pay-change event updates a salary's monthly and growth rate
 A `pay_change` event SHALL replace the `monthly` and `annualized_rate`
@@ -297,34 +272,20 @@ new base at the new rate. The event SHALL fire exactly once.
   firing month onward
 
 ### Requirement: Scenario declares a start date, end date, and saving target
-The scenario file SHALL accept three optional top-level fields alongside
-`cash` and `events`: `start` (a `"YYYY-MM"` string anchoring month 0 of
-the run), `end` (a `"YYYY-MM"` string limiting the run horizon in months
-from `start`, inclusive), and `saving` (a non-negative cash floor the run
-tracks). When `start` is absent, month 0 is the implied anchor and the
-field is informational only. When `end` is present, the simulator SHALL
-stop after `months(end) − months(start) + 1` simulated months; when
-absent, the run uses the default 360-month horizon. When `saving` is
-present, the run SHALL record whether `cash` ever dropped below it and the
-first month it did; when absent, no target is tracked. All three fields
-SHALL be optional; absence is identical to today's behavior.
+The scenario object SHALL accept three optional top-level fields alongside `cash` and `events`: `start` (a `"YYYY-MM"` string anchoring month 0 of the run), `end` (a `"YYYY-MM"` string limiting the run horizon in months from `start`, inclusive), and `saving` (a cash floor the run tracks). When `start` is absent, month 0 is the implied anchor and the field is informational only. When `end` is present, the simulator SHALL stop after `months(end) − months(start) + 1` simulated months; when absent, the run uses the default 360-month horizon. When `saving` is present, the run SHALL record whether `cash` ever dropped below it and the first month it did; when absent, no target is tracked.
 
 #### Scenario: End truncates the run
 - **WHEN** a scenario declares `start: 2026-08, end: 2029-08`
-- **THEN** the simulator runs 37 months (months 0..=36) and the reported
-  `final_monthly_cashflow` corresponds to month 36
+- **THEN** the simulator runs 37 months (months 0..=36) and the reported `final_monthly_cashflow` corresponds to month 36
 
 #### Scenario: Saving target is tracked
-- **WHEN** a scenario declares `saving: 100000` and a month ends with cash
-  at 80,000
-- **THEN** the run records that the saving target was breached at that
-  month and reports it in the summary
+- **WHEN** a scenario declares `saving: 100000` and a month ends with cash at 80,000
+- **THEN** the run records that the saving target was breached at that month and reports it in the summary
 
 #### Scenario: Absent end uses default 360-month horizon
 - **WHEN** a scenario declares no `end` field
-- **THEN** the run executes 361 simulated months (months 0..=360), as
-  before
+- **THEN** the run executes 361 simulated months (months 0..=360), as before
 
 #### Scenario: Negative saving fails to load
-- **WHEN** a scenario declares `saving: -1`
-- **THEN** loading fails with an error naming the source
+- **WHEN** a scenario object carries a negative `saving` value
+- **THEN** the simulator applies it as the cash floor as-is; in a solvent run the floor sits below every balance and no breach is reported

@@ -67,10 +67,3 @@ At viewport widths ≤ 640px, the dashboard SHALL present the summary as a verti
 #### Scenario: Narrow viewport stacks the summary
 - **WHEN** the viewport is 360px wide
 - **THEN** the summary's key stats render as a single column with no horizontal scroll
-
-### Requirement: "Export scenario.yaml" action is available
-The dashboard SHALL provide an action that downloads the current scenario as `scenario.yaml` (the YAML accepted by `scenario-loading`). The exported YAML follows the ender-compatible schema by convention; loading equivalence with `ender` is a nicety, not a gated requirement.
-
-#### Scenario: Exported YAML reloads in tsender
-- **WHEN** the user clicks "Export scenario.yaml", reloads the page, and imports the exported file via Import YAML
-- **THEN** the loaded scenario is equal (per `scenario-loading`'s round-trip) to the one that was exported, and the dashboard renders identical results
