@@ -14,6 +14,7 @@
 
 import { useEffect, useRef } from "react";
 import uPlot from "uplot";
+import "uplot/dist/uPlot.min.css";
 import type { MonthResult } from "@/scenario/types";
 import { humanize } from "@/ui/labels";
 
@@ -37,25 +38,38 @@ function token(name: string): string {
  * grayscale and under dichromatic vision, where hue alone is not enough. */
 const ASSETS_DASH = [5, 3];
 
+function heightFor(width: number): number {
+  return Math.max(240, Math.min(width * 0.6, 360));
+}
+
 export function ResultsChart(props: ResultsChartProps) {
   const ref = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
   // Markers change with the chart props; the draw hook closes over the latest.
   const markers = useRef(props);
   markers.current = props;
+  const markerColors = useRef({
+    insolvency: "",
+    savingBreach: "",
+    terminal: "",
+  });
 
   useEffect(() => {
     if (!ref.current) return;
 
-    const height = () =>
-      Math.max(240, Math.min(ref.current!.clientWidth * 0.6, 360));
-
     const stroke = {
       cash: token("--chart-cash"),
       assets: token("--chart-assets"),
+      axis: token("--fg-muted"),
+      grid: token("--border"),
       insolvency: token("--danger"),
       savingBreach: token("--warning"),
       terminal: token("--accent"),
+    };
+    markerColors.current = {
+      insolvency: stroke.insolvency,
+      savingBreach: stroke.savingBreach,
+      terminal: stroke.terminal,
     };
 
     if (plotRef.current) {
@@ -65,6 +79,11 @@ export function ResultsChart(props: ResultsChartProps) {
       const assets = plot.series[2];
       if (cash) cash.stroke = stroke.cash;
       if (assets) assets.stroke = stroke.assets;
+      for (const axis of plot.axes) {
+        axis.stroke = stroke.axis;
+        if (axis.grid) axis.grid.stroke = stroke.grid;
+        if (axis.ticks) axis.ticks.stroke = stroke.grid;
+      }
       plot.setData(buildData(props.months), true);
       plot.redraw(true);
       return;
@@ -72,11 +91,21 @@ export function ResultsChart(props: ResultsChartProps) {
 
     const opts: uPlot.Options = {
       width: ref.current.clientWidth,
-      height: height(),
+      height: heightFor(ref.current.clientWidth),
       scales: { x: { time: false } },
       axes: [
-        { label: "month" },
-        { label: "HKD" },
+        {
+          label: "month",
+          stroke: stroke.axis,
+          grid: { stroke: stroke.grid },
+          ticks: { stroke: stroke.grid },
+        },
+        {
+          label: "HKD",
+          stroke: stroke.axis,
+          grid: { stroke: stroke.grid },
+          ticks: { stroke: stroke.grid },
+        },
       ],
       series: [
         {},
@@ -93,27 +122,15 @@ export function ResultsChart(props: ResultsChartProps) {
           (u) => {
             const { insolvencyMonth, savingBreachMonth, terminalMonth } =
               markers.current;
-            drawMarker(u, insolvencyMonth, stroke.insolvency);
-            drawMarker(u, savingBreachMonth, stroke.savingBreach);
-            drawMarker(u, terminalMonth, stroke.terminal);
+            const colors = markerColors.current;
+            drawMarker(u, insolvencyMonth, colors.insolvency);
+            drawMarker(u, savingBreachMonth, colors.savingBreach);
+            drawMarker(u, terminalMonth, colors.terminal);
           },
         ],
       },
     };
     plotRef.current = new uPlot(opts, buildData(props.months), ref.current);
-
-    const ro = new ResizeObserver(() => {
-      if (plotRef.current && ref.current) {
-        plotRef.current.setSize({
-          width: ref.current.clientWidth,
-          height: height(),
-        });
-      }
-    });
-    ro.observe(ref.current);
-    return () => {
-      ro.disconnect();
-    };
   }, [
     props.months,
     props.insolvencyMonth,
@@ -121,6 +138,22 @@ export function ResultsChart(props: ResultsChartProps) {
     props.terminalMonth,
     props.theme,
   ]);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(() => {
+      if (plotRef.current) {
+        plotRef.current.setSize({
+          width: element.clientWidth,
+          height: heightFor(element.clientWidth),
+        });
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     return () => {

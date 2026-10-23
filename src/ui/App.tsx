@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { RunResult, Scenario } from "@/scenario/types";
 import { ScenarioForm } from "@/ui/ScenarioForm";
 import { ResultsSummary } from "@/ui/ResultsSummary";
@@ -23,8 +23,8 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const { result, run, pending } = useSimulation(scenario);
 
-  // Apply the theme to <html> before paint so the first frame is already right.
-  useEffect(() => {
+  // Apply the theme before the chart's paint effect reads its canvas colors.
+  useLayoutEffect(() => {
     applyTheme(theme);
   }, [theme]);
 

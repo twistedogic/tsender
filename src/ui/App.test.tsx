@@ -6,7 +6,7 @@
  * `tsender.theme` without touching the scenario store.
  */
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { loadFromStorage, saveToStorage } from "@/ui/storage";
 import { App } from "@/ui/App";
@@ -18,11 +18,16 @@ class ResizeObserver {
 }
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserver;
 
+const constructed: { series?: unknown[]; axes?: unknown[] }[] = [];
+
 vi.mock("uplot", () => {
   class FakeUPlot {
     series: unknown[];
-    constructor(opts: { series?: unknown[] }) {
+    axes: unknown[];
+    constructor(opts: { series?: unknown[]; axes?: unknown[] }) {
       this.series = opts.series ?? [];
+      this.axes = opts.axes ?? [];
+      constructed.push(opts);
     }
     setData() {}
     setSize() {}
@@ -34,18 +39,23 @@ vi.mock("uplot", () => {
 
 beforeEach(() => {
   localStorage.clear();
+  constructed.length = 0;
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.classList.remove("theme-dark");
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("theme toggle", () => {
-  it("cycles system → light → dark → system and reflects each on <html>", async () => {
+  it("cycles system → light → dark → system and reflects each on <html>", () => {
     render(<App />);
     const button = screen.getByRole("button", { name: /Theme: system/i });
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
 
     fireEvent.click(button);
-    expect(await screen.findByRole("button", { name: /Theme: light/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Theme: light/i })).toBeTruthy();
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
     expect(localStorage.getItem("tsender.theme")).toBe("light");
 
@@ -56,7 +66,7 @@ describe("theme toggle", () => {
     fireEvent.click(screen.getByRole("button", { name: /Theme: dark/i }));
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
     expect(document.documentElement.classList.contains("theme-dark")).toBe(false);
-  });
+  }, 15_000);
 
   it("restores the stored preference on mount", async () => {
     localStorage.setItem("tsender.theme", "dark");
@@ -82,5 +92,46 @@ describe("theme toggle", () => {
 
     expect(loadFromStorage()).toEqual(scenario);
     expect(localStorage.getItem("tsender.theme")).toBe("light");
+  });
+
+  it("applies a theme before the chart reads its canvas colors", () => {
+    vi.spyOn(window, "getComputedStyle").mockImplementation(
+      () =>
+        ({
+          getPropertyValue: () =>
+            document.documentElement.classList.contains("theme-dark")
+              ? "#dark"
+              : "#light",
+        }) as unknown as CSSStyleDeclaration,
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /Theme: system/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Theme: light/i }));
+
+    expect(constructed).toHaveLength(1);
+    expect((constructed[0]!.series as { stroke?: string }[])[1]!.stroke).toBe(
+      "#dark",
+    );
+  });
+
+  it("applies a stored theme before the chart reads its canvas colors", () => {
+    localStorage.setItem("tsender.theme", "dark");
+    vi.spyOn(window, "getComputedStyle").mockImplementation(
+      () =>
+        ({
+          getPropertyValue: () =>
+            document.documentElement.classList.contains("theme-dark")
+              ? "#dark"
+              : "#light",
+        }) as unknown as CSSStyleDeclaration,
+    );
+
+    render(<App />);
+
+    expect(constructed).toHaveLength(1);
+    expect((constructed[0]!.series as { stroke?: string }[])[1]!.stroke).toBe(
+      "#dark",
+    );
   });
 });

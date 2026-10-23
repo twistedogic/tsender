@@ -21,10 +21,15 @@ import { join } from "node:path";
 import type { MonthResult } from "@/scenario/types";
 import type uPlot from "uplot";
 
+let activeObservers = 0;
 class ResizeObserver {
-  observe() {}
+  observe() {
+    activeObservers++;
+  }
   unobserve() {}
-  disconnect() {}
+  disconnect() {
+    activeObservers--;
+  }
 }
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserver;
 
@@ -36,15 +41,21 @@ Object.defineProperty(HTMLElement.prototype, "clientWidth", {
 /** Options passed to each uPlot construction, in order. */
 const constructed: uPlot.Options[] = [];
 /** Every FakeUPlot instance, so a test can assert on the live plot. */
-const instances: { series: uPlot.Series[]; redrawCount: number }[] = [];
+const instances: {
+  series: uPlot.Series[];
+  axes: uPlot.Axis[];
+  redrawCount: number;
+}[] = [];
 
 vi.mock("uplot", () => {
   class FakeUPlot {
     series: uPlot.Series[];
+    axes: uPlot.Axis[];
     redrawCount = 0;
     constructor(opts: uPlot.Options) {
       constructed.push(opts);
       this.series = opts.series as uPlot.Series[];
+      this.axes = opts.axes as uPlot.Axis[];
       instances.push(this);
     }
     setData() {}
@@ -88,6 +99,7 @@ function fakePlot(): uPlot {
 beforeEach(() => {
   constructed.length = 0;
   instances.length = 0;
+  activeObservers = 0;
   document.documentElement.removeAttribute("style");
   document.documentElement.classList.remove("theme-dark");
 });
@@ -98,7 +110,11 @@ afterEach(() => {
 });
 
 /** The single plot instance the component under test built. */
-function plot(): { series: uPlot.Series[]; redrawCount: number } {
+function plot(): {
+  series: uPlot.Series[];
+  axes: uPlot.Axis[];
+  redrawCount: number;
+} {
   expect(instances, "no uPlot instance was constructed").toHaveLength(1);
   return instances[0]!;
 }
@@ -139,6 +155,37 @@ describe("ResultsChart theming", () => {
     expect(plot().redrawCount).toBeGreaterThan(0);
   });
 
+  it("themes the axis labels and grid for each theme", () => {
+    document.documentElement.style.setProperty("--fg-muted", "#777777");
+    document.documentElement.style.setProperty("--border", "#eeeeee");
+    const { rerender } = render(<ResultsChart months={MONTHS} />);
+
+    expect(constructed[0]!.axes![0]!.stroke).toBe("#777777");
+    expect(constructed[0]!.axes![1]!.stroke).toBe("#777777");
+    expect(constructed[0]!.axes![0]!.grid!.stroke).toBe("#eeeeee");
+    expect(constructed[0]!.axes![1]!.grid!.stroke).toBe("#eeeeee");
+
+    document.documentElement.style.setProperty("--fg-muted", "#cccccc");
+    document.documentElement.style.setProperty("--border", "#444444");
+    rerender(<ResultsChart months={MONTHS} theme="dark" />);
+
+    expect(plot().axes[0]!.stroke).toBe("#cccccc");
+    expect(plot().axes[1]!.stroke).toBe("#cccccc");
+    expect(plot().axes[0]!.grid!.stroke).toBe("#444444");
+    expect(plot().axes[1]!.grid!.stroke).toBe("#444444");
+  });
+
+  it("keeps observing its size after chart data changes", () => {
+    const { rerender, unmount } = render(<ResultsChart months={MONTHS} />);
+    expect(activeObservers).toBe(1);
+
+    rerender(<ResultsChart months={MONTHS} theme="dark" />);
+    expect(activeObservers).toBe(1);
+
+    unmount();
+    expect(activeObservers).toBe(0);
+  });
+
   it("distinguishes the two series without relying on hue alone", () => {
     render(<ResultsChart months={MONTHS} />);
     // assets_value keeps a dash pattern, which survives grayscale and
@@ -165,6 +212,28 @@ describe("ResultsChart theming", () => {
     expect(strokes).toEqual(["#aa0000"]);
   });
 
+  it("re-reads marker colours when the theme changes", () => {
+    document.documentElement.style.setProperty("--danger", "#aa0000");
+    const { rerender } = render(
+      <ResultsChart months={MONTHS} insolvencyMonth={1} />,
+    );
+
+    document.documentElement.style.setProperty("--danger", "#ff0000");
+    rerender(
+      <ResultsChart months={MONTHS} insolvencyMonth={1} theme="dark" />,
+    );
+
+    const draw = constructed[0]!.hooks!.draw as Array<(u: uPlot) => void>;
+    const p = fakePlot();
+    const strokes: string[] = [];
+    p.ctx.stroke = function (this: { strokeStyle: string }) {
+      strokes.push(this.strokeStyle);
+    };
+
+    draw[0]!(p);
+    expect(strokes).toEqual(["#ff0000"]);
+  });
+
   it("draws no marker outside the x range", () => {
     render(<ResultsChart months={MONTHS} insolvencyMonth={999} />);
     const draw = constructed[0]!.hooks!.draw as Array<(u: uPlot) => void>;
@@ -175,6 +244,11 @@ describe("ResultsChart theming", () => {
     };
     draw[0]!(p);
     expect(drew).toBe(false);
+  });
+
+  it("loads uPlot's layout stylesheet so its canvas cannot overflow", () => {
+    const src = readFileSync(join(__dirname, "ResultsChart.tsx"), "utf8");
+    expect(src).toMatch(/import ["']uplot\/dist\/uPlot\.min\.css["']/);
   });
 
   it("contains no paint literal in the chart module", () => {
