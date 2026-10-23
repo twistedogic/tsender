@@ -26,7 +26,7 @@ export function TaxBlockForm({
       {enabled ? (
         <>
           <fieldset>
-            <legend>status</legend>
+            <legend>Status</legend>
             <label>
               <input
                 type="radio"
@@ -49,13 +49,13 @@ export function TaxBlockForm({
             </label>
           </fieldset>
           <NumberField
-            label="children"
+            label="Children"
             value={v.children ?? 0}
             onChange={(n) => wrap({ children: n })}
             min={0}
           />
           <fieldset>
-            <legend>parents (dependent allowance)</legend>
+            <legend>Parents (dependent allowance)</legend>
             {(v.parents ?? []).map((p, i) => (
               <ParentEntry
                 key={i}
@@ -101,7 +101,7 @@ function ParentEntry({
   return (
     <div className="parent-row">
       <fieldset>
-        <legend>age band</legend>
+        <legend>Age band</legend>
         <label>
           <input
             type="radio"
@@ -127,7 +127,7 @@ function ParentEntry({
           checked={value.living_with}
           onChange={(e) => onChange({ ...value, living_with: e.currentTarget.checked })}
         />{" "}
-        living_with
+        Living with you
       </label>
       <button type="button" onClick={onRemove}>Remove</button>
     </div>

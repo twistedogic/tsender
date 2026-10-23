@@ -1,32 +1,78 @@
 /**
  * uPlot-based monthly chart for `cash` and `assets_value` over the run.
  *
- * Spec: openspec/changes/add-tsender-v01/specs/results-display/spec.md —
- * one line per simulated month, reflows on resize, legible at 320px.
- * Vertical markers for insolvency / saving-breach / terminal months.
+ * Spec: openspec/specs/results-display/spec.md — one line per simulated month,
+ * reflows on resize, legible at 320px. Delta
+ * openspec/changes/rework-style-inkwell/specs/results-display/spec.md — series
+ * separable without hue, every drawn element ≥ 3:1 in every theme.
+ *
+ * uPlot paints to a canvas, which cannot resolve CSS custom properties at
+ * paint time. Colors are read off :root with getComputedStyle and handed to
+ * uPlot as literals; on a theme change the effect re-runs and restyles the
+ * existing plot rather than rebuilding it.
  */
 
 import { useEffect, useRef } from "react";
 import uPlot from "uplot";
 import type { MonthResult } from "@/scenario/types";
+import { humanize } from "@/ui/labels";
 
 export interface ResultsChartProps {
   months: MonthResult[];
   insolvencyMonth?: number;
   savingBreachMonth?: number;
   terminalMonth?: number;
+  /** Current theme mode. Changing it restyles the plot in place. */
+  theme?: string;
 }
+
+/** Resolve a theme token to the literal uPlot's canvas can paint. */
+function token(name: string): string {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+}
+
+/** assets_value keeps a dash pattern so the series stay separable in
+ * grayscale and under dichromatic vision, where hue alone is not enough. */
+const ASSETS_DASH = [5, 3];
 
 export function ResultsChart(props: ResultsChartProps) {
   const ref = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
+  // Markers change with the chart props; the draw hook closes over the latest.
+  const markers = useRef(props);
+  markers.current = props;
 
   useEffect(() => {
     if (!ref.current) return;
-    const data = buildData(props.months);
+
+    const height = () =>
+      Math.max(240, Math.min(ref.current!.clientWidth * 0.6, 360));
+
+    const stroke = {
+      cash: token("--chart-cash"),
+      assets: token("--chart-assets"),
+      insolvency: token("--danger"),
+      savingBreach: token("--warning"),
+      terminal: token("--accent"),
+    };
+
+    if (plotRef.current) {
+      // Theme change: restyle the existing plot and rebuild its Path2D cache.
+      const plot = plotRef.current;
+      const cash = plot.series[1];
+      const assets = plot.series[2];
+      if (cash) cash.stroke = stroke.cash;
+      if (assets) assets.stroke = stroke.assets;
+      plot.setData(buildData(props.months), true);
+      plot.redraw(true);
+      return;
+    }
+
     const opts: uPlot.Options = {
       width: ref.current.clientWidth,
-      height: Math.max(240, Math.min(ref.current.clientWidth * 0.6, 360)),
+      height: height(),
       scales: { x: { time: false } },
       axes: [
         { label: "month" },
@@ -34,29 +80,33 @@ export function ResultsChart(props: ResultsChartProps) {
       ],
       series: [
         {},
-        { label: "cash", stroke: "#0b3a5b", width: 2 },
-        { label: "assets_value", stroke: "#777", width: 2, dash: [4, 4] },
+        { label: humanize("cash"), stroke: stroke.cash, width: 2 },
+        {
+          label: humanize("assets_value"),
+          stroke: stroke.assets,
+          width: 2,
+          dash: ASSETS_DASH,
+        },
       ],
       hooks: {
         draw: [
           (u) => {
-            drawMarker(u, props.insolvencyMonth, "#b91c1c");
-            drawMarker(u, props.savingBreachMonth, "#d97706");
-            drawMarker(u, props.terminalMonth, "#0b3a5b");
+            const { insolvencyMonth, savingBreachMonth, terminalMonth } =
+              markers.current;
+            drawMarker(u, insolvencyMonth, stroke.insolvency);
+            drawMarker(u, savingBreachMonth, stroke.savingBreach);
+            drawMarker(u, terminalMonth, stroke.terminal);
           },
         ],
       },
     };
-    if (plotRef.current) {
-      plotRef.current.setData(data, true);
-    } else {
-      plotRef.current = new uPlot(opts, data, ref.current);
-    }
+    plotRef.current = new uPlot(opts, buildData(props.months), ref.current);
+
     const ro = new ResizeObserver(() => {
       if (plotRef.current && ref.current) {
         plotRef.current.setSize({
           width: ref.current.clientWidth,
-          height: Math.max(240, Math.min(ref.current.clientWidth * 0.6, 360)),
+          height: height(),
         });
       }
     });
@@ -64,7 +114,13 @@ export function ResultsChart(props: ResultsChartProps) {
     return () => {
       ro.disconnect();
     };
-  }, [props.months, props.insolvencyMonth, props.savingBreachMonth, props.terminalMonth]);
+  }, [
+    props.months,
+    props.insolvencyMonth,
+    props.savingBreachMonth,
+    props.terminalMonth,
+    props.theme,
+  ]);
 
   useEffect(() => {
     return () => {

@@ -6,6 +6,7 @@ import { ResultsChart } from "@/ui/ResultsChart";
 import { RunOutcomes } from "@/ui/RunOutcomes";
 import { useSimulation } from "@/ui/useSimulation";
 import { loadFromStorage, saveToStorage } from "@/ui/storage";
+import { applyTheme, loadTheme, saveTheme, THEME_LABEL, type Theme } from "@/ui/theme";
 
 const DEFAULT_SCENARIO: Scenario = {
   cash: 500_000,
@@ -19,7 +20,21 @@ export function App() {
   const initial = useMemo<Scenario>(() => loadFromStorage() ?? DEFAULT_SCENARIO, []);
   const [scenario, setScenario] = useState<Scenario>(initial);
   const [storageToast, setStorageToast] = useState<string | null>(null);
+  const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const { result, run, pending } = useSimulation(scenario);
+
+  // Apply the theme to <html> before paint so the first frame is already right.
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const cycleTheme = () =>
+    setTheme((prev) => {
+      const next: Theme =
+        prev === "system" ? "light" : prev === "light" ? "dark" : "system";
+      saveTheme(next);
+      return next;
+    });
 
   // Persist on every change.
   useEffect(() => {
@@ -45,18 +60,20 @@ export function App() {
             onRun={run}
             pending={pending}
             storageToast={storageToast}
+            theme={theme}
+            onCycleTheme={cycleTheme}
           />
           <ScenarioForm scenario={scenario} onChange={setScenario} />
         </div>
         <div className="results">
-          {result ? <Results result={result} scenario={scenario} /> : null}
+          {result ? <Results result={result} scenario={scenario} theme={theme} /> : null}
         </div>
       </section>
     </div>
   );
 }
 
-function Results({ result, scenario }: { result: RunResult; scenario: Scenario }) {
+function Results({ result, scenario, theme }: { result: RunResult; scenario: Scenario; theme: Theme }) {
   const insolvencyMonth = firstInsolvent(result.months);
   const savingBreachMonth = savingBreach(result, scenario.saving);
   return (
@@ -67,6 +84,7 @@ function Results({ result, scenario }: { result: RunResult; scenario: Scenario }
         insolvencyMonth={insolvencyMonth}
         savingBreachMonth={savingBreachMonth}
         terminalMonth={result.terminal_month}
+        theme={theme}
       />
       <Markers
         insolvencyMonth={insolvencyMonth}
@@ -84,16 +102,27 @@ function Toolbar({
   onRun,
   pending,
   storageToast,
+  theme,
+  onCycleTheme,
 }: {
   onReset: () => void;
   onRun: () => void;
   pending: boolean;
   storageToast: string | null;
+  theme: Theme;
+  onCycleTheme: () => void;
 }) {
   return (
     <div className="toolbar">
       <button type="button" onClick={onRun}>Run</button>
       <button type="button" onClick={onReset}>Reset</button>
+      <button
+        type="button"
+        onClick={onCycleTheme}
+        aria-label={THEME_LABEL[theme]}
+      >
+        {THEME_LABEL[theme]}
+      </button>
       {pending ? <span className="pending">running…</span> : null}
       {storageToast ? <span className="toast">{storageToast}</span> : null}
     </div>

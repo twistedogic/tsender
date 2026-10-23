@@ -20,10 +20,10 @@ export function ResultsSummary({ result }: { result: RunResult }) {
   return (
     <table className="results-summary">
       <tbody>
-        <tr><th>Final cash</th><td data-testid="final-cash">{fmt(last.cash)}</td></tr>
+        <tr className="key"><th>Final cash</th><td data-testid="final-cash">{fmt(last.cash)}</td></tr>
         <tr><th>Final assets</th><td>{fmt(last.assets_value)}</td></tr>
         <tr><th>Final monthly cashflow</th><td>{fmt(last.monthly_cashflow)}</td></tr>
-        <tr><th>Minimum cash</th><td>{fmt(minCash)} (month {minCashMonth})</td></tr>
+        <tr className="key"><th>Minimum cash</th><td>{fmt(minCash)} (month {minCashMonth})</td></tr>
         <tr>
           <th>First insolvent month</th>
           <td>{firstInsolventMonth === -1 ? "never" : `month ${firstInsolventMonth}`}</td>

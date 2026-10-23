@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import type { Event, Scenario } from "@/scenario/types";
 import { EventForm } from "@/ui/EventForm";
 import { TaxBlockForm } from "@/ui/TaxBlockForm";
+import { humanize } from "@/ui/labels";
 
 const EVENT_TYPES = [
   "job",
@@ -44,7 +45,7 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
 
       <details open>
         <summary>
-          <h2>events ({scenario.events.length})</h2>
+          <h2>Events ({scenario.events.length})</h2>
         </summary>
         <div className="events-add">
           <label htmlFor="event-type">
@@ -55,7 +56,7 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
               onChange={(e) => setNewEventType(e.currentTarget.value as EventTypeChoice)}
             >
               {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>{humanize(t)}</option>
               ))}
             </select>
           </label>
@@ -69,6 +70,7 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
               <EventForm
                 event={e}
                 index={idx}
+                scenario={scenario}
                 onChange={(event) => {
                   const next = scenario.events.slice();
                   next[idx] = event;
@@ -92,7 +94,7 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
 
       <details>
         <summary>
-          <h2>tax block (household allowance)</h2>
+          <h2>Tax block (household allowance)</h2>
         </summary>
         <TaxBlockForm value={scenario.tax} onChange={(tax) => top({ tax })} />
       </details>
@@ -167,19 +169,19 @@ function TopFields({
   return (
     <section className="top-fields">
       <h2>Scenario</h2>
-      <Field label="cash">
+      <Field label="Cash">
         <NumberInput value={scenario.cash} onChange={(n) => onPatch({ cash: n })} step={1} min={0} />
       </Field>
-      <Field label="reserve_months">
+      <Field label="Reserve months">
         <NumberInput value={scenario.reserve_months ?? 0} onChange={(n) => onPatch({ reserve_months: n })} step={1} min={0} />
       </Field>
-      <Field label="start (YYYY-MM)">
+      <Field label="Start (YYYY-MM)">
         <MonthInput value={scenario.start ?? ""} onChange={(s) => onPatch({ start: s || undefined })} />
       </Field>
-      <Field label="end (YYYY-MM)">
+      <Field label="End (YYYY-MM)">
         <MonthInput value={scenario.end ?? ""} onChange={(s) => onPatch({ end: s || undefined })} />
       </Field>
-      <Field label="saving">
+      <Field label="Saving target">
         <NumberInput value={scenario.saving ?? 0} onChange={(n) => onPatch({ saving: n })} step={1} min={0} />
       </Field>
     </section>
