@@ -44,7 +44,7 @@ Sanity checks in the dumped tree:
 - `<cash spinbutton>` is populated (default scenario: `500000`)
 - `<Final cash>` column shows a formatted number (default: `9,979,095`)
 - `run outcomes` region is present with an end-solvency callout
+- the yearly trajectory table is present (a `Year 1` row header)
 
 Caveats:
-- lightpanda 1.6.0 throws `Path2D is not defined`; the chart canvas renders blank but every other part of the page works. Re-run after upgrading lightpanda.
 - localStorage state persists between runs in lightpanda; clear the storage or use `--no-cookie` / fresh profile if a run depends on a blank slate.

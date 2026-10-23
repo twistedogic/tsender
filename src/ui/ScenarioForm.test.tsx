@@ -4,14 +4,6 @@ import { ScenarioForm } from "@/ui/ScenarioForm";
 import { loadFromStorage, saveToStorage } from "@/ui/storage";
 import type { Scenario } from "@/scenario/types";
 
-// jsdom doesn't implement ResizeObserver; uPlot's chart would crash otherwise.
-class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-(globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserver;
-
 describe("ScenarioForm", () => {
   it("renders top-level fields and shows cash value", () => {
     const initial: Scenario = {

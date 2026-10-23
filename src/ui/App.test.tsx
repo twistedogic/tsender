@@ -11,41 +11,47 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { loadFromStorage, saveToStorage } from "@/ui/storage";
 import { App } from "@/ui/App";
 
-class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-(globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserver;
-
-const constructed: { series?: unknown[]; axes?: unknown[] }[] = [];
-
-vi.mock("uplot", () => {
-  class FakeUPlot {
-    series: unknown[];
-    axes: unknown[];
-    constructor(opts: { series?: unknown[]; axes?: unknown[] }) {
-      this.series = opts.series ?? [];
-      this.axes = opts.axes ?? [];
-      constructed.push(opts);
-    }
-    setData() {}
-    setSize() {}
-    redraw() {}
-    destroy() {}
-  }
-  return { default: FakeUPlot };
-});
-
 beforeEach(() => {
   localStorage.clear();
-  constructed.length = 0;
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.classList.remove("theme-dark");
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("trajectory table", () => {
+  it("shows the run's trajectory as a table", () => {
+    render(<App />);
+    expect(screen.getByTestId("trajectory-table")).toBeTruthy();
+    expect(
+      document.querySelectorAll(".trajectory-table tbody tr").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("notes the passive-income crossing on its row", () => {
+    saveToStorage({
+      cash: 2_000_000,
+      events: [
+        {
+          type: "investment",
+          when: 0,
+          fund: { principal: 1_000_000, annualized_rate: 0.05 },
+        },
+        {
+          type: "expense",
+          when: 0,
+          expense: { monthly: 1000, annualized_rate: 0 },
+        },
+      ],
+    });
+    render(<App />);
+    const rows = [...document.querySelectorAll(".trajectory-table tbody tr")];
+    expect(rows[0]!.querySelector("td.trajectory-notes")?.textContent).toBe(
+      "passive covers",
+    );
+  });
 });
 
 describe("theme toggle", () => {
@@ -94,44 +100,19 @@ describe("theme toggle", () => {
     expect(localStorage.getItem("tsender.theme")).toBe("light");
   });
 
-  it("applies a theme before the chart reads its canvas colors", () => {
-    vi.spyOn(window, "getComputedStyle").mockImplementation(
-      () =>
-        ({
-          getPropertyValue: () =>
-            document.documentElement.classList.contains("theme-dark")
-              ? "#dark"
-              : "#light",
-        }) as unknown as CSSStyleDeclaration,
-    );
-
+  it("applies the theme to <html> before the results panel renders", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /Theme: system/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Theme: light/i }));
 
-    expect(constructed).toHaveLength(1);
-    expect((constructed[0]!.series as { stroke?: string }[])[1]!.stroke).toBe(
-      "#dark",
-    );
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    expect(screen.getByTestId("trajectory-table")).toBeTruthy();
   });
 
-  it("applies a stored theme before the chart reads its canvas colors", () => {
+  it("applies a stored theme before the results panel renders", () => {
     localStorage.setItem("tsender.theme", "dark");
-    vi.spyOn(window, "getComputedStyle").mockImplementation(
-      () =>
-        ({
-          getPropertyValue: () =>
-            document.documentElement.classList.contains("theme-dark")
-              ? "#dark"
-              : "#light",
-        }) as unknown as CSSStyleDeclaration,
-    );
-
     render(<App />);
 
-    expect(constructed).toHaveLength(1);
-    expect((constructed[0]!.series as { stroke?: string }[])[1]!.stroke).toBe(
-      "#dark",
-    );
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(screen.getByTestId("trajectory-table")).toBeTruthy();
   });
 });

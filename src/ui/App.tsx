@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { RunResult, Scenario } from "@/scenario/types";
 import { ScenarioForm } from "@/ui/ScenarioForm";
 import { ResultsSummary } from "@/ui/ResultsSummary";
-import { ResultsChart } from "@/ui/ResultsChart";
+import { TrajectoryTable } from "@/ui/TrajectoryTable";
 import { RunOutcomes } from "@/ui/RunOutcomes";
 import { useSimulation } from "@/ui/useSimulation";
 import { loadFromStorage, saveToStorage } from "@/ui/storage";
@@ -66,25 +66,27 @@ export function App() {
           <ScenarioForm scenario={scenario} onChange={setScenario} />
         </div>
         <div className="results">
-          {result ? <Results result={result} scenario={scenario} theme={theme} /> : null}
+          {result ? <Results result={result} scenario={scenario} /> : null}
         </div>
       </section>
     </div>
   );
 }
 
-function Results({ result, scenario, theme }: { result: RunResult; scenario: Scenario; theme: Theme }) {
+function Results({ result, scenario }: { result: RunResult; scenario: Scenario }) {
   const insolvencyMonth = firstInsolvent(result.months);
   const savingBreachMonth = savingBreach(result, scenario.saving);
   return (
     <>
       <ResultsSummary result={result} />
-      <ResultsChart
+      <TrajectoryTable
         months={result.months}
-        insolvencyMonth={insolvencyMonth}
-        savingBreachMonth={savingBreachMonth}
-        terminalMonth={result.terminal_month}
-        theme={theme}
+        markers={{
+          insolvencyMonth,
+          savingBreachMonth,
+          terminalMonth: result.terminal_month,
+          passiveIncomeMonth: result.passive_income_month,
+        }}
       />
       <Markers
         insolvencyMonth={insolvencyMonth}

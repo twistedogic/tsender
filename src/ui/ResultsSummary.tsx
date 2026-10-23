@@ -1,4 +1,5 @@
 import type { RunResult } from "@/scenario/types";
+import { fmt } from "@/ui/format";
 
 export function ResultsSummary({ result }: { result: RunResult }) {
   const months = result.months;
@@ -35,8 +36,4 @@ export function ResultsSummary({ result }: { result: RunResult }) {
       </tbody>
     </table>
   );
-}
-
-function fmt(n: number): string {
-  return new Intl.NumberFormat("en-HK", { maximumFractionDigits: 0 }).format(n);
 }

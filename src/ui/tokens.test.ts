@@ -6,8 +6,7 @@
  *
  * jsdom does not resolve stylesheet custom properties, so this reads styles.css
  * and parses the token blocks directly. That is the source of truth anyway:
- * the lightpanda smoke test cannot render canvas, so nothing downstream
- * verifies these ratios.
+ * no browser is in the test loop, so nothing downstream verifies these ratios.
  */
 
 import { readFileSync } from "node:fs";
@@ -74,8 +73,6 @@ const DATA_TOKENS = [
   "--danger",
   "--success",
   "--warning",
-  "--chart-cash",
-  "--chart-assets",
 ];
 
 const SURFACES = ["--bg-panel", "--bg", "--bg-inset"];
