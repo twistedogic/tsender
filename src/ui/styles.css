@@ -183,7 +183,8 @@ select {
   min-height: 36px;
 }
 
-@media (max-width: 480px) {
+/* Tap targets stay ≥ 44px on the mobile breakpoint the spec names. */
+@media (max-width: 640px) {
   input[type="number"],
   input[type="text"],
   input[type="month"],

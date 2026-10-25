@@ -8,6 +8,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { useState } from "react";
 import { ScenarioForm } from "@/ui/ScenarioForm";
 import type { Scenario } from "@/scenario/types";
 
@@ -22,6 +23,12 @@ const BASE: Scenario = {
 
 function withEvents(...events: Scenario["events"]): Scenario {
   return { ...BASE, events: [...BASE.events, ...events] };
+}
+
+/** The form wired to its own state, the way the app drives it. */
+function Harness({ initial }: { initial: Scenario }) {
+  const [scenario, setScenario] = useState(initial);
+  return <ScenarioForm scenario={scenario} onChange={setScenario} />;
 }
 
 /**
@@ -56,6 +63,47 @@ describe("defining events expose a name", () => {
     // Only `id` — no `name` key introduced.
     expect(Object.keys(job)).not.toContain("name");
     expect(Object.keys(emitted.events[1]!)).not.toContain("name");
+  });
+
+  it("lets the name be cleared", () => {
+    const onChange = vi.fn();
+    render(<ScenarioForm scenario={BASE} onChange={onChange} />);
+
+    fireEvent.change(textboxFor("Name"), { target: { value: "" } });
+
+    const emitted = onChange.mock.calls[0]![0] as Scenario;
+    const job = emitted.events[0]!;
+    expect("id" in job && job.id).toBeFalsy();
+  });
+
+  it("lets an embedded item's id be cleared", () => {
+    const onChange = vi.fn();
+    const s: Scenario = {
+      cash: 1,
+      events: [
+        {
+          type: "buy_home",
+          when: 0,
+          home: {
+            sqft: 100,
+            price_per_sqft: 100,
+            mortgage: { monthly: 1, period: 12, id: "mt" },
+          },
+        },
+      ],
+    };
+    render(<ScenarioForm scenario={s} onChange={onChange} />);
+
+    const label = screen.getAllByText("ID (optional)")[0]!;
+    const input = label.closest("label")!.querySelector("input")!;
+    fireEvent.change(input, { target: { value: "" } });
+
+    const emitted = onChange.mock.calls[0]![0] as Scenario;
+    const home = emitted.events[0] as Extract<
+      Scenario["events"][number],
+      { type: "buy_home" }
+    >;
+    expect(home.home.mortgage?.id).toBeFalsy();
   });
 
   it("stores the name verbatim rather than humanized", () => {
@@ -167,10 +215,25 @@ describe("targeting events offer a choice", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("preselects the first candidate when a targeting event has no id", () => {
+  it("shows no target until one is chosen", () => {
+    // The select must not display a name the scenario does not carry: the
+    // simulator would resolve that name to nothing.
     const s = withEvents({ type: "layoff", when: 30 });
     render(<ScenarioForm scenario={s} onChange={() => {}} />);
     const select = screen.getByRole("combobox", { name: /Layoff item|Target/i });
-    expect((select as HTMLSelectElement).value).toBe("main job");
+    expect((select as HTMLSelectElement).value).toBe("");
+  });
+
+  it("an unset target stays unset when another item is renamed", () => {
+    render(
+      <Harness initial={withEvents({ type: "end", when: 12, id: "" })} />,
+    );
+    const select = () =>
+      screen.getByRole("combobox", { name: /End item|Target/i }) as HTMLSelectElement;
+    expect(select().value).toBe("");
+
+    fireEvent.change(textboxFor("Name"), { target: { value: "renamed" } });
+
+    expect(select().value).toBe("");
   });
 });

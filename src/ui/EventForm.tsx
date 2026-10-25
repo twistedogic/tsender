@@ -167,6 +167,13 @@ function BuyHomeBody({ event, onChange }: ChangedProps) {
       value={event.home}
       onChange={(home) => onChange({ ...event, home })}
       allowMortgage
+      mortgage={event.home.mortgage}
+      onMortgageChange={(m) =>
+        onChange({
+          ...event,
+          home: { ...event.home, ...(m ? { mortgage: m } : {}) },
+        })
+      }
     />
   );
 }
@@ -218,7 +225,7 @@ function InvestmentBody({ event, onChange }: ChangedProps) {
             value={event.fund.investment.id ?? ""}
             onChange={(s) =>
               set({
-                investment: { ...event.fund.investment!, ...(s ? { id: s } : {}) },
+                investment: withId(event.fund.investment!, s),
               })
             }
           />
@@ -369,10 +376,11 @@ function ItemSelect({
       <label htmlFor={id}>{label}</label>
       <select
         id={id}
-        value={hasStored ? stored : options[0]!.name}
+        value={hasStored ? stored : ""}
         onChange={(e) => setId(e.currentTarget.value)}
       >
         {optional ? <option value="">{optionalLabel()}</option> : null}
+        {!optional && !hasStored ? <option value="">{unsetLabel()}</option> : null}
         {groupByKind(options).map(([kind, group]) => (
           <optgroup key={kind} label={kindTitle(kind)}>
             {group.map((c) => (
@@ -389,6 +397,11 @@ function ItemSelect({
 
 function optionalLabel(): string {
   return "First of kind";
+}
+
+/** The state of a required target that has not been chosen yet. */
+function unsetLabel(): string {
+  return "Choose an item…";
 }
 
 function groupByKind(items: ActiveItem[]): [ItemKind, ActiveItem[]][] {
@@ -415,9 +428,17 @@ function LabeledId({
     <TextField
       label={label}
       value={id}
-      onChange={(v) => onChange({ ...event, ...(v ? { id: v } : {}) } as Event)}
+      onChange={(v) => onChange(withId(event as { id?: string }, v) as Event)}
     />
   );
+}
+
+/**
+ * Set an id, or drop it when the field is emptied — an emptied field must
+ * not keep the old name.
+ */
+function withId<T extends { id?: string }>(base: T, value: string): T {
+  return { ...base, ...(value ? { id: value } : { id: undefined }) };
 }
 
 function GrowthFields({
@@ -484,7 +505,7 @@ function MortgageEditor({
       <legend>Mortgage</legend>
       <NumberField label="Monthly" value={mortgage.monthly} onChange={(v) => onChange({ ...mortgage, monthly: v })} step={1} />
       <NumberField label="Term (months)" value={mortgage.period} onChange={(v) => onChange({ ...mortgage, period: v })} step={1} min={0} />
-      <TextField label="ID (optional)" value={mortgage.id ?? ""} onChange={(s) => onChange({ ...mortgage, ...(s ? { id: s } : {}) })} />
+      <TextField label="ID (optional)" value={mortgage.id ?? ""} onChange={(s) => onChange(withId(mortgage, s))} />
       <button type="button" onClick={() => onChange(undefined)}>Remove mortgage</button>
     </fieldset>
   );
@@ -497,7 +518,7 @@ function RentEditor({ value, onChange }: { value: RentSpec; onChange: (r: RentSp
       <NumberField label="Monthly" value={value.monthly} onChange={(v) => onChange({ ...value, monthly: v })} step={1} />
       <NumberField label="Annual growth rate" value={value.annualized_rate} onChange={(v) => onChange({ ...value, annualized_rate: v })} step={0.01} />
       <NumberField label="Occupancy (0-1)" value={value.occupancy} onChange={(v) => onChange({ ...value, occupancy: v })} step={0.1} min={0} max={1} />
-      <TextField label="ID (optional)" value={value.id ?? ""} onChange={(s) => onChange({ ...value, ...(s ? { id: s } : {}) })} />
+      <TextField label="ID (optional)" value={value.id ?? ""} onChange={(s) => onChange(withId(value, s))} />
     </fieldset>
   );
 }

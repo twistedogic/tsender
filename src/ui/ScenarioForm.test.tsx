@@ -29,6 +29,41 @@ describe("ScenarioForm", () => {
     );
     expect(screen.getByText(/Add event/i)).toBeInTheDocument();
   });
+
+  it("a buy_home exposes its mortgage fields", () => {
+    // scenario-loading gives buy_home a mortgage; the subform must offer it.
+    render(
+      <ScenarioForm
+        scenario={{
+          cash: 100,
+          events: [
+            { type: "buy_home", when: 0, home: { sqft: 100, price_per_sqft: 100 } },
+          ],
+        }}
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Add mortgage/i })).toBeInTheDocument();
+  });
+
+  it("lists the events in month order", () => {
+    render(
+      <ScenarioForm
+        scenario={{
+          cash: 100,
+          events: [
+            { type: "job", when: 12, salary: { monthly: 1, annualized_rate: 0 } },
+            { type: "job", when: 2, salary: { monthly: 1, annualized_rate: 0 } },
+          ],
+        }}
+        onChange={() => {}}
+      />,
+    );
+    const months = [
+      ...document.querySelectorAll('.event-form input[aria-label="Month"]'),
+    ].map((i) => (i as HTMLInputElement).value);
+    expect(months).toEqual(["2", "12"]);
+  });
 });
 
 describe("scenario storage", () => {

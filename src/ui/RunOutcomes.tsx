@@ -1,4 +1,5 @@
 import type { RunResult } from "@/scenario/types";
+import { fmt } from "@/ui/format";
 
 export function RunOutcomes({ result }: { result: RunResult }) {
   const months = result.months;
@@ -13,7 +14,7 @@ export function RunOutcomes({ result }: { result: RunResult }) {
     <section className="run-outcomes" aria-label="run outcomes">
       <div className="callout" data-met={met}>
         <strong>End solvency:</strong>{" "}
-        final net worth <code>{new Intl.NumberFormat("en-HK").format(finalNW)}</code>{" "}
+        final net worth <code>{fmt(finalNW)}</code>{" "}
         {met ? "(met)" : "(missed)"}
       </div>
       <div className="callout">

@@ -23,7 +23,7 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const { result, run, pending } = useSimulation(scenario);
 
-  // Apply the theme before the chart's paint effect reads its canvas colors.
+  // Apply the theme before the results panel paints.
   useLayoutEffect(() => {
     applyTheme(theme);
   }, [theme]);

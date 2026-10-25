@@ -59,6 +59,7 @@ export function TaxBlockForm({
             {(v.parents ?? []).map((p, i) => (
               <ParentEntry
                 key={i}
+                index={i}
                 value={p}
                 onChange={(np) => {
                   const list = (v.parents ?? []).slice();
@@ -90,10 +91,12 @@ export function TaxBlockForm({
 }
 
 function ParentEntry({
+  index,
   value,
   onChange,
   onRemove,
 }: {
+  index: number;
   value: ParentAllowance;
   onChange: (p: ParentAllowance) => void;
   onRemove: () => void;
@@ -105,7 +108,7 @@ function ParentEntry({
         <label>
           <input
             type="radio"
-            name={`age_band-${value.age_band}`}
+            name={`parent-age-band-${index}`}
             checked={value.age_band === "60+"}
             onChange={() => onChange({ ...value, age_band: "60+" })}
           />{" "}
@@ -114,7 +117,7 @@ function ParentEntry({
         <label>
           <input
             type="radio"
-            name={`age_band-${value.age_band}`}
+            name={`parent-age-band-${index}`}
             checked={value.age_band === "55-59"}
             onChange={() => onChange({ ...value, age_band: "55-59" })}
           />{" "}

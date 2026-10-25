@@ -146,7 +146,8 @@ describe("token structure", () => {
   });
 
   it("keeps tap targets at 44px on narrow viewports", () => {
-    const rule = CSS.match(/@media \(max-width: 480px\)\s*\{[^}]*\}/);
+    // scenario-authoring: the mobile breakpoint is 640px.
+    const rule = CSS.match(/@media \(max-width: 640px\)\s*\{[^}]*\}/);
     expect(rule, "narrow-viewport block not found").not.toBeNull();
     expect(rule![0]).toMatch(/min-height:\s*44px/);
   });

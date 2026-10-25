@@ -34,6 +34,10 @@ export interface ScenarioFormProps {
 export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
   const top = (patch: Partial<Scenario>) => onChange({ ...scenario, ...patch });
   const [newEventType, setNewEventType] = useState<EventTypeChoice>("job");
+  // The list is shown in month order; ties keep the scenario's own order.
+  const ordered = scenario.events
+    .map((e, index) => ({ e, index }))
+    .sort((a, b) => a.e.when - b.e.when || a.index - b.index);
 
   return (
     <form
@@ -65,25 +69,25 @@ export function ScenarioForm({ scenario, onChange }: ScenarioFormProps) {
           </button>
         </div>
         <ol className="event-list">
-          {scenario.events.map((e, idx) => (
-            <li key={idx}>
+          {ordered.map(({ e, index }) => (
+            <li key={index}>
               <EventForm
                 event={e}
-                index={idx}
+                index={index}
                 scenario={scenario}
                 onChange={(event) => {
                   const next = scenario.events.slice();
-                  next[idx] = event;
+                  next[index] = event;
                   top({ events: next });
                 }}
                 onRemove={() => {
                   const next = scenario.events.slice();
-                  next.splice(idx, 1);
+                  next.splice(index, 1);
                   top({ events: next });
                 }}
                 onDuplicate={() => {
                   const next = scenario.events.slice();
-                  next.splice(idx + 1, 0, { ...e, when: e.when + 1 });
+                  next.splice(index + 1, 0, { ...e, when: e.when + 1 });
                   top({ events: next });
                 }}
               />
