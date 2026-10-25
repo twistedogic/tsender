@@ -211,7 +211,8 @@ export type Cashflow =
   | WithdrawalCashflow
   | InvestmentContributionCashflow
   | RentalIncomeCashflow
-  | MortgagePaymentCashflow;
+  | MortgagePaymentCashflow
+  | OneOffCashflow;
 
 export interface SalaryCashflow {
   kind: "Salary";
@@ -277,6 +278,17 @@ export interface MortgagePaymentCashflow {
   age: number;
   /** Total remaining periods; once 0, the cashflow contributes nothing. */
   remaining: number;
+}
+
+/** A one-off payout: it fires once, in `when`, and never recurs. */
+export interface OneOffCashflow {
+  kind: "OneOff";
+  id?: string;
+  /** The month the one-off fires. */
+  when: number;
+  /** Signed: positive adds to cash, negative subtracts. */
+  amount: number;
+  fired: boolean;
 }
 
 export type Asset = Fund | Property;

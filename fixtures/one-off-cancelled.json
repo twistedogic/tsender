@@ -1,0 +1,50 @@
+{
+  "cash": 20000,
+  "events": [
+    {
+      "type": "job",
+      "when": 0,
+      "id": "me",
+      "salary": {
+        "monthly": 20000,
+        "annualized_rate": 0
+      }
+    },
+    {
+      "type": "end",
+      "when": 0,
+      "id": "me"
+    },
+    {
+      "type": "expense",
+      "when": 0,
+      "expense": {
+        "monthly": 1000,
+        "annualized_rate": 0
+      }
+    },
+    {
+      "type": "one_off_expense",
+      "when": 6,
+      "id": "repair",
+      "one_off": {
+        "amount": 5000
+      }
+    },
+    {
+      "type": "end",
+      "when": 3,
+      "id": "repair"
+    },
+    {
+      "type": "one_off_income",
+      "when": 9,
+      "one_off": {
+        "amount": 3000
+      }
+    }
+  ],
+  "reserve_months": 1,
+  "start": "2026-01",
+  "end": "2026-12"
+}

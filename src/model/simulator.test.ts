@@ -150,6 +150,14 @@ describe("event firing", () => {
     expect(r.months[12]?.monthly_cashflow).toBeCloseTo(950, 6);
   });
 
+  it("a same-month end event sees the item it consumes", () => {
+    // The end event is listed first; the item it names is created in the
+    // same month. A defining event fires before the event that consumes it.
+    const r = runScenario(y(`{"cash":0,"events":[{"type":"end","when":0,"id":"me"},{"type":"job","when":0,"id":"me","salary":{"monthly":1000,"annualized_rate":0}}]}`));
+    expect(r.months[0]?.monthly_cashflow).toBe(0);
+    expect(r.months[1]?.monthly_cashflow).toBe(0);
+  });
+
   it("layoff without id removes the first salary; with id targets the labeled one", () => {
     const r1 = runScenario(y(`{"cash":0,"events":[{"type":"job","when":0,"salary":{"monthly":1000,"annualized_rate":0}},{"type":"job","when":0,"salary":{"monthly":2000,"annualized_rate":0}},{"type":"layoff","when":6}]}`));
     expect(r1.months[5]?.monthly_cashflow).toBeCloseTo(1000 - 50 + 2000 - 100, 6);
@@ -221,9 +229,31 @@ describe("one-off events", () => {
     const r = runScenario(y(`{"cash":20000,"events":[{"type":"one_off_expense","when":3,"one_off":{"amount":-5000}}]}`));
     expect(r.months[3]?.monthly_cashflow).toBe(-5000);
   });
+  it("an end event removes a one-off that carries an id", () => {
+    // scenario-loading: "One-off may carry an id" — an end event firing
+    // before the one-off's month removes it.
+    const r = runScenario(y(`{"cash":20000,"events":[{"type":"one_off_expense","when":6,"id":"oo","one_off":{"amount":5000}},{"type":"end","when":3,"id":"oo"}]}`));
+    expect(r.months[6]?.monthly_cashflow).toBe(0);
+    expect(r.months[6]?.cash).toBe(20_000);
+  });
 });
 
 describe("reserve settlement", () => {
+  it("the reserve target counts the month's grown expenses", () => {
+    // The target is "that month's recurring expense total" — the grown
+    // amount, not the base. At month 5 the 1000/mo expense has grown to
+    // 1000 * 1.01^5 = 1051.01, so the target is 1051.01.
+    const r = runScenario(y(`{"cash":12000,"reserve_months":1,"events":[{"type":"expense","when":0,"expense":{"monthly":1000,"annualized_rate":0.12}},{"type":"investment","when":0,"fund":{"principal":5000,"annualized_rate":0}}]}`));
+    expect(r.months[5]?.cash).toBeCloseTo(1051.01, 2);
+  });
+
+  it("a paid-off mortgage stops counting toward the reserve target", () => {
+    // After month 2 the mortgage is done: the target is the 50 expense, not
+    // 150 — so the fund is left alone.
+    const r = runScenario(y(`{"cash":1500,"reserve_months":1,"events":[{"type":"expense","when":0,"expense":{"monthly":50,"annualized_rate":0}},{"type":"buy_home","when":0,"home":{"sqft":10,"price_per_sqft":100,"mortgage":{"monthly":100,"period":2}}},{"type":"investment","when":0,"fund":{"principal":2000,"annualized_rate":0}}]}`));
+    expect(r.months[2]?.cash).toBeCloseTo(100, 4);
+  });
+
   it("absent reserve_months leaves cash untouched even when negative", () => {
     const r = runScenario(y(`{"cash":100,"events":[{"type":"expense","when":0,"expense":{"monthly":200,"annualized_rate":0}}]}`));
     expect(r.months[0]?.cash).toBeCloseTo(-100, 4);
@@ -310,6 +340,20 @@ describe("simulation-output wrapper", () => {
   it("passive_income_month is absent when salary alone covers expenses", () => {
     const r = runScenario(y(`{"cash":0,"events":[{"type":"job","when":0,"salary":{"monthly":5000,"annualized_rate":0}}]}`));
     expect(r.passive_income_month).toBeUndefined();
+  });
+
+  it("passive_income_month ignores a paid-off mortgage", () => {
+    // A pension of 550 covers the 500 expense but not the 100 mortgage; once
+    // the mortgage is paid off (month 2), passive income covers the expenses.
+    const r = runScenario(y(`{"cash":0,"events":[{"type":"expense","when":0,"expense":{"monthly":500,"annualized_rate":0}},{"type":"pension","when":3,"pension":{"monthly":550,"annualized_rate":0}},{"type":"buy_home","when":0,"home":{"sqft":1,"price_per_sqft":100,"mortgage":{"monthly":100,"period":2}}}]}`));
+    expect(r.passive_income_month).toBe(3);
+  });
+
+  it("passive_income_month counts the month's fund growth", () => {
+    // A fund of 1000 at 12%/yr adds 10 * 1.01^m in month m, so the 10.40
+    // expense is covered from month 4, not month 3.
+    const r = runScenario(y(`{"cash":0,"events":[{"type":"expense","when":0,"expense":{"monthly":10.4,"annualized_rate":0}},{"type":"investment","when":0,"fund":{"principal":1000,"annualized_rate":0.12}}]}`));
+    expect(r.passive_income_month).toBe(4);
   });
 });
 

@@ -11,6 +11,7 @@ import type {
   InvestmentContributionCashflow,
   MonthResult,
   MortgagePaymentCashflow,
+  OneOffCashflow,
   Property,
   RentalIncomeCashflow,
   RunResult,
@@ -26,7 +27,6 @@ import {
 import { settleReserve } from "@/model/reserve";
 import {
   findPassiveIncomeCrossing,
-  recurringExpenseTotal,
   type MonthBreakdown,
 } from "@/output/passive";
 
@@ -81,14 +81,18 @@ interface State {
   oneOffNetThisMonth: number;
   assetCostThisMonth: number;
   recurringNetThisMonth: number;
+  /** This month's fund growth — the increase in each fund's principal. */
+  fundGrowthThisMonth: number;
 }
 
 export function runScenario(scenario: Scenario): RunResult {
   const state: State = {
     cash: scenario.cash,
-    cashflows: [],
+    cashflows: oneOffCashflows(scenario.events),
     assets: [],
-    pendingEvents: scenario.events.slice(),
+    pendingEvents: scenario.events.filter(
+      (e) => e.type !== "one_off_expense" && e.type !== "one_off_income",
+    ),
     incomeAccrued: 0,
     mpfAccrued: 0,
     rentAccrued: 0,
@@ -97,6 +101,7 @@ export function runScenario(scenario: Scenario): RunResult {
     oneOffNetThisMonth: 0,
     assetCostThisMonth: 0,
     recurringNetThisMonth: 0,
+    fundGrowthThisMonth: 0,
   };
   const maxMonths = horizonMonths(scenario);
 
@@ -142,6 +147,14 @@ function step(state: State, m: number): void {
   state.assetCostThisMonth = 0;
 
   fireEventsAt(state, m);
+
+  // One-offs due this month fire once. An `end` event that fired earlier
+  // already removed the cancelled ones.
+  for (const c of state.cashflows) {
+    if (c.kind !== "OneOff" || c.fired || c.when !== m) continue;
+    c.fired = true;
+    state.oneOffNetThisMonth += c.amount;
+  }
 
   // Income / MPF / rent accruals for the tax base.
   for (const c of state.cashflows) {
@@ -202,8 +215,10 @@ function step(state: State, m: number): void {
   }
 
   // Grow fund principals (the growth feeds passive income for next crossing).
+  state.fundGrowthThisMonth = 0;
   for (const a of state.assets) {
     if (a.kind === "Fund") {
+      state.fundGrowthThisMonth += a.principal * (a.annualized_rate / 12);
       a.principal *= 1 + a.annualized_rate / 12;
     }
   }
@@ -235,21 +250,88 @@ function cashflowToCash(c: Cashflow): number {
       return grown(c.monthly, c.annualized_rate, c.age) * c.occupancy;
     case "MortgagePayment":
       return c.remaining > 0 ? -c.monthly : 0;
+    case "OneOff":
+      return 0;
   }
+}
+
+/**
+ * The month's recurring expenses: the magnitude of every negative recurring
+ * flow. Derived from `cashflowToCash`, so it mirrors the cash exactly — a
+ * paid-off mortgage stops counting and a growing expense counts at its
+ * grown amount (scenario-loading spec).
+ */
+function recurringExpenseTotal(cashflows: Cashflow[]): number {
+  let total = 0;
+  for (const c of cashflows) {
+    const flow = cashflowToCash(c);
+    if (flow < 0) total -= flow;
+  }
+  return total;
 }
 
 
 
 // ---------- Event firing ----------
 
+/**
+ * Same-month order: an event that creates an item fires before the event
+ * that consumes it, so a targeting event always sees the item it names.
+ */
+const FIRE_RANK: Record<Event["type"], number> = {
+  job: 0,
+  pension: 0,
+  expense: 0,
+  tuition: 0,
+  withdrawal: 0,
+  buy_home: 0,
+  buy_to_let: 0,
+  investment: 0,
+  end: 1,
+  layoff: 1,
+  graduate: 1,
+  refinance: 1,
+  pay_change: 1,
+  one_off_expense: 2,
+  one_off_income: 2,
+  downturn: 2,
+  death: 2,
+};
+
 function fireEventsAt(state: State, m: number): void {
   const stillPending: Event[] = [];
+  const firing: Event[] = [];
   for (const e of state.pendingEvents) {
-    if (e.when === m) applyEvent(e, state);
+    if (e.when === m) firing.push(e);
     else if (e.when > m) stillPending.push(e);
     // when < m: silently drop (consumed in prior months).
   }
+  // A stable sort keeps same-rank events in scenario order.
+  firing.sort((a, b) => FIRE_RANK[a.type] - FIRE_RANK[b.type]);
+  for (const e of firing) applyEvent(e, state);
   state.pendingEvents = stillPending;
+}
+
+/**
+ * One-offs become cashflow items up front, so an `end` event can cancel one
+ * by id before its month (scenario-loading spec).
+ */
+function oneOffCashflows(events: Event[]): OneOffCashflow[] {
+  const out: OneOffCashflow[] = [];
+  for (const e of events) {
+    if (e.type !== "one_off_expense" && e.type !== "one_off_income") continue;
+    out.push({
+      kind: "OneOff",
+      ...(e.id !== undefined && { id: e.id }),
+      when: e.when,
+      amount:
+        e.type === "one_off_expense"
+          ? -Math.abs(e.one_off.amount)
+          : Math.abs(e.one_off.amount),
+      fired: false,
+    });
+  }
+  return out;
 }
 
 function applyEvent(e: Event, state: State): void {
@@ -389,10 +471,9 @@ function applyEvent(e: Event, state: State): void {
       return;
     }
     case "one_off_expense":
-      state.oneOffNetThisMonth -= Math.abs(e.one_off.amount);
-      return;
     case "one_off_income":
-      state.oneOffNetThisMonth += Math.abs(e.one_off.amount);
+      // One-offs are cashflow items from the start (see `oneOffCashflows`),
+      // so there is nothing to add when the event fires.
       return;
     case "death":
       state.terminalAtMonth = e.when;
@@ -551,6 +632,7 @@ function pruneCashflowsAfterSettlement(cashflows: Cashflow[], survivors: Asset[]
 
 function tickAges(state: State): void {
   for (const c of state.cashflows) {
+    if (c.kind === "OneOff") continue;
     c.age++;
     if (c.kind === "MortgagePayment" && c.remaining > 0) c.remaining--;
   }
@@ -559,20 +641,17 @@ function tickAges(state: State): void {
 function buildBreakdown(state: State): MonthBreakdown {
   let pension = 0;
   let rental = 0;
-  let fundGrowth = 0;
   for (const c of state.cashflows) {
-    const rate = "annualized_rate" in c ? c.annualized_rate : 0;
-    const v = grown(c.monthly, rate, c.age);
-    if (c.kind === "Pension") pension += v;
-    else if (c.kind === "RentalIncome") rental += v * c.occupancy;
-  }
-  for (const a of state.assets) {
-    if (a.kind === "Fund") fundGrowth += a.principal * (a.annualized_rate / 12);
+    if (c.kind === "Pension") {
+      pension += grown(c.monthly, c.annualized_rate, c.age);
+    } else if (c.kind === "RentalIncome") {
+      rental += grown(c.monthly, c.annualized_rate, c.age) * c.occupancy;
+    }
   }
   return {
     pension,
     rental,
-    fundGrowth,
+    fundGrowth: state.fundGrowthThisMonth,
     recurringExpenses: recurringExpenseTotal(state.cashflows),
   };
 }

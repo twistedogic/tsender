@@ -1,0 +1,77 @@
+{
+  "terminal": false,
+  "months": [
+    {
+      "month": 0,
+      "cash": 19000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 1,
+      "cash": 18000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 2,
+      "cash": 17000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 3,
+      "cash": 16000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 4,
+      "cash": 15000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 5,
+      "cash": 14000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 6,
+      "cash": 13000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 7,
+      "cash": 12000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 8,
+      "cash": 11000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 9,
+      "cash": 13000,
+      "assets_value": 0,
+      "monthly_cashflow": 2000
+    },
+    {
+      "month": 10,
+      "cash": 12000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    },
+    {
+      "month": 11,
+      "cash": 11000,
+      "assets_value": 0,
+      "monthly_cashflow": -1000
+    }
+  ]
+}

@@ -6,7 +6,7 @@
  * every simulated month from M through the end".
  */
 
-import type { Cashflow, MonthResult } from "@/scenario/types";
+import type { MonthResult } from "@/scenario/types";
 
 export interface MonthBreakdown {
   /** Pension payouts this month. */
@@ -54,28 +54,3 @@ export function findPassiveIncomeCrossing(
   }
   return undefined;
 }
-
-/**
- * Sum of all negative recurring flows this month (magnitude), excluding
- * one-offs (which fire once and aren't "recurring") and tax (charged
- * separately at block end). Mortgage payments and fund contributions count.
- */
-export function recurringExpenseTotal(activeCashflows: Cashflow[]): number {
-  let total = 0;
-  for (const c of activeCashflows) {
-    switch (c.kind) {
-      case "Expense":
-      case "Tuition":
-      case "Withdrawal":
-      case "InvestmentContribution":
-      case "MortgagePayment":
-        total += c.monthly; // magnitude
-        break;
-      default:
-        break;
-    }
-  }
-  return total;
-}
-
-/** Sum of rental income (occupancy-applied) this month. */
